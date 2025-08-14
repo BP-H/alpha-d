@@ -51,7 +51,12 @@ export default function Sidebar() {
   const [showKey, setShowKey] = useState<string | null>(null);
 
   const setKey = (k: keyof Keys, v: string) => setKeys({ ...keys, [k]: v });
-  const clearAll = () => { localStorage.clear(); location.reload(); };
+  const clearAll = () => {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("sn."))
+      .forEach(k => localStorage.removeItem(k));
+    location.reload();
+  };
 
   return (
     <>
