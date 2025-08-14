@@ -165,8 +165,12 @@ export default function Sidebar() {
                 onChange={(e) => setApiKey(e.target.value)}
                 autoComplete="off"
               />
-              <button className="icon" onClick={() => setShowKey(s => !s)} aria-label="Show API key">{showKey ? "🙈" : "👁"}</button>
-              <button className="icon danger" onClick={() => setApiKey("")} aria-label="Clear API key">✕</button>
+              <button className="icon" onClick={() => setShowKey(s => !s)} aria-label="Show API key">
+                {showKey ? "🙈" : "👁"}
+              </button>
+              <button className="icon danger" onClick={() => setApiKey("")} aria-label="Clear API key">
+                ✕
+              </button>
             </div>
 
             <div className="section">Backend</div>
