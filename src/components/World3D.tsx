@@ -93,9 +93,12 @@ export default function World3D() {
     let tintTarget: RGB = { r: 48, g: 64, b: 140 };
 
     // Watch visible post images
-    const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(".pc-media img"));
-    if (imgs.length) {
-      const io = new IntersectionObserver(entries => {
+    let io: IntersectionObserver | null = null;
+    const scanImages = () => {
+      io?.disconnect();
+      const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(".pc-media img"));
+      if (!imgs.length) return;
+      io = new IntersectionObserver(entries => {
         const best = entries
           .filter(e => e.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
@@ -103,7 +106,15 @@ export default function World3D() {
         const c = avgColor(best.target as HTMLImageElement);
         if (c) tintTarget = c;
       }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
-      imgs.forEach(img => (img.complete ? io.observe(img) : img.addEventListener("load", () => io.observe(img), { once: true })));
+      imgs.forEach(img => (img.complete ? io!.observe(img) : img.addEventListener("load", () => io!.observe(img), { once: true })));
+    };
+    scanImages();
+
+    const feed = document.querySelector(".feed-content");
+    let mo: MutationObserver | null = null;
+    if (feed) {
+      mo = new MutationObserver(() => scanImages());
+      mo.observe(feed, { childList: true, subtree: true });
     }
 
     // ---- Draw helpers (always receive non-null ctx)
@@ -198,6 +209,8 @@ export default function World3D() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      io?.disconnect();
+      mo?.disconnect();
     };
   }, []);
 
