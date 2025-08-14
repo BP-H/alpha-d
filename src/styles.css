@@ -43,9 +43,6 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* =========================
    Feed layout (above world)
    ========================= */
-.content-viewport{height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:10}
-.feed-wrap{padding:8px 0 80px}
-.feed-content{width:var(--feed-max);margin:0 auto;display:grid;gap:var(--post-gap);padding:0}
 
 /* (Optional) Post skeleton bits you may already use */
 .post{display:grid;grid-template-rows:auto auto auto;gap:0;background:transparent}

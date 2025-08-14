@@ -3,12 +3,26 @@
   --post-gap: 2px;
 }
 
-.content-viewport.feed-wrap {
-  /* Make the feed its own scrolling area above the 3D world layer */
-  overflow: auto;
+/* Scrollable viewport for the feed above the 3D world layer */
+.content-viewport {
   height: 100dvh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  z-index: 10;
 }
 
+/* Outer feed wrapper spacing */
+.feed-wrap {
+  padding: 8px 0 80px;
+}
+
+/* Grid container for posts */
 .feed-content {
+  width: var(--feed-max);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--post-gap);
+  padding: 0;
   position: relative;
 }
