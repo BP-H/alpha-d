@@ -19,7 +19,11 @@ const ORB_RADIUS = ORB_SIZE / 2;
 
 export default function AssistantOrb(){
   // position
-  const [pos, setPos] = useState(() => ({ x: window.innerWidth - ORB_SIZE, y: window.innerHeight - ORB_SIZE }));
+  const getInitialPos = () =>
+    typeof window === "undefined"
+      ? { x: 0, y: 0 }
+      : { x: window.innerWidth - ORB_SIZE, y: window.innerHeight - ORB_SIZE };
+  const [pos, setPos] = useState(getInitialPos);
   useEffect(() => {
     const onResize = () => {
       setPos(p => ({
