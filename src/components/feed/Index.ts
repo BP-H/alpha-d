@@ -1,1 +1,2 @@
-export { default as Feed } from "./Feed";
+// src/components/feed/index.ts
+export { default } from "./Feed";
