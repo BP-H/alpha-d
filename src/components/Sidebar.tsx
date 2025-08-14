@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import "./Sidebar.css";
 import bus from "../lib/bus";
+import IntegrationSettings from "./IntegrationSettings";
 
 type Keys = {
   openai?: string;
@@ -166,16 +167,7 @@ export default function Sidebar() {
               <p className="hint">Keys are stored locally only (browser <code>localStorage</code>).</p>
             </section>
 
-            {/* Integrations */}
-            <section className="card">
-              <header>Integrations</header>
-              <div className="grid two">
-                <button className="tile"><span>Vercel</span><em>connected</em></button>
-                <button className="tile"><span>GitHub</span><em>connected</em></button>
-                <button className="tile"><span>Notion</span><em>ready</em></button>
-                <button className="tile"><span>Slack</span><em>ready</em></button>
-              </div>
-            </section>
+            <IntegrationSettings />
 
             {/* Privacy */}
             <section className="card">

@@ -44,3 +44,14 @@ To preview the sample posts included in [`src/lib/placeholders.ts`](src/lib/plac
 2. Redeploy the project.
 
 When `VITE_DEMO=1` is set, the app displays the placeholder posts defined in `src/lib/placeholders.ts`.
+
+## Platform Integrations
+
+After launching the app, open the sidebar to access **Integrations**. Connect to any of the supported platforms (X, Facebook or LinkedIn) and use the provided buttons to import content or repost.
+
+- **Connect** – stores a connection flag in `localStorage`.
+- **Import** – pulls in placeholder content and shows a toast on success or failure.
+- **Repost** – sends sample content to the chosen platform and surfaces the result via toast.
+- **Disconnect** – removes the connection and clears the flag.
+
+These actions are placeholders; in a production app they would call the respective platform APIs.
