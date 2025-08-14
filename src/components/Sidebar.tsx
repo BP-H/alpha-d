@@ -7,10 +7,18 @@ type DecisionKind = "standard" | "important";
 
 function useLocal<T>(key: string, init: T) {
   const [val, setVal] = useState<T>(() => {
-    try { const raw = localStorage.getItem(key); return raw ? (JSON.parse(raw) as T) : init; }
-    catch { return init; }
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : init;
+    } catch {
+      return init;
+    }
   });
-  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }, [key, val]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch {}
+  }, [key, val]);
   return [val, setVal] as const;
 }
 
@@ -33,31 +41,51 @@ export default function Sidebar() {
   useEffect(() => { bus.emit("search:update", { query }); }, [query]);
   useEffect(() => { bus.emit("backend:update", { useReal, backendUrl }); }, [useReal, backendUrl]);
 
+  // Allow other UI to toggle the sidebar
+  useEffect(() => {
+    const off1 = bus.on?.("sidebar:open", () => setOpen(true));
+    const off2 = bus.on?.("sidebar:close", () => setOpen(false));
+    const off3 = bus.on?.("sidebar:toggle", () => setOpen(v => !v));
+    return () => { off1?.(); off2?.(); off3?.(); };
+  }, [setOpen]);
+
+  // Close on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setOpen]);
+
   const goto = (label: string) => bus.emit("nav:goto", { label });
 
-  const placeholderSvg = `data:image/svg+xml;utf8,${encodeURIComponent(`
-  <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
-    <defs>
-      <radialGradient id='g' cx='30%' cy='30%' r='80%'>
-        <stop offset='0%' stop-color='#fff9ff'/>
-        <stop offset='60%' stop-color='#ffc6ee'/>
-        <stop offset='100%' stop-color='#ff74de'/>
-      </radialGradient>
-    </defs>
-    <rect width='128' height='128' rx='28' fill='#0f1117'/>
-    <circle cx='64' cy='64' r='36' fill='url(#g)'/>
-  </svg>`)}"`;
+  const placeholderSvg = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='g' cx='30%' cy='30%' r='80%'>
+          <stop offset='0%' stop-color='#ffffff'/>
+          <stop offset='60%' stop-color='#e9efff'/>
+          <stop offset='100%' stop-color='#b4c2ff'/>
+        </radialGradient>
+      </defs>
+      <rect width='128' height='128' rx='28' fill='#0f1117'/>
+      <circle cx='64' cy='64' r='36' fill='url(#g)'/>
+    </svg>`
+  )}`;
 
   return (
     <>
-      {open && <div className="snv2-scrim" onClick={() => setOpen(false)} />}
+      {open && <button className="snv2-scrim" aria-label="Close menu" onClick={() => setOpen(false)} />}
 
       <aside className={`snv2 ${open ? "open" : "fab"} ${heroOpen ? "hero" : ""}`}>
         {!open && (
-          <button className="snv2-fab" aria-label="Open menu" onClick={() => setOpen(true)}>
+          <button
+            className="snv2-fab"
+            aria-label="Open menu"
+            onClick={() => setOpen(true)}
+          >
             <img
               src="/avatar.jpg"
-              alt="me"
+              alt="Profile"
               width={56}
               height={56}
               loading="lazy"
@@ -68,7 +96,7 @@ export default function Sidebar() {
         )}
 
         {open && (
-          <div className="snv2-panel">
+          <div className="snv2-panel" role="dialog" aria-modal="true" aria-label="superNova_2177 menu">
             <div className="snv2-panel__head">
               <button className="snv2-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
               <button className="snv2-brand" onClick={() => goto("Feed")} aria-label="superNova home">
@@ -78,7 +106,12 @@ export default function Sidebar() {
             </div>
 
             <div className="snv2-hero">
-              <button className="avatar" onClick={() => setHeroOpen(v => !v)} aria-expanded={heroOpen}>
+              <button
+                className="avatar"
+                onClick={() => setHeroOpen(v => !v)}
+                aria-expanded={heroOpen}
+                aria-controls="snv2-hero-card"
+              >
                 <img
                   src="/avatar.jpg"
                   alt="avatar"
@@ -90,7 +123,7 @@ export default function Sidebar() {
                 />
               </button>
 
-              <div className={`hero-card ${heroOpen ? "on" : ""}`}>
+              <div id="snv2-hero-card" className={`hero-card ${heroOpen ? "on" : ""}`}>
                 <div className="name">taha_gungor</div>
                 <div className="sub">ceo / test_tech • artist</div>
                 <div className="metrics">
@@ -101,21 +134,26 @@ export default function Sidebar() {
             </div>
 
             <div className="section">Identity</div>
-            <label className="label">I am a…</label>
-            <select className="input" value={species} onChange={(e) => setSpecies(e.target.value as Species)}>
+            <label className="label" htmlFor="sid-species">I am a…</label>
+            <select id="sid-species" className="input" value={species} onChange={(e) => setSpecies(e.target.value as Species)}>
               <option value="human">human</option>
               <option value="company">company</option>
               <option value="ai">ai</option>
             </select>
 
-            <label className="label">Decision kind</label>
-            <select className="input" value={decisionKind} onChange={(e) => setDecisionKind(e.target.value as DecisionKind)}>
+            <label className="label" htmlFor="sid-decision">Decision kind</label>
+            <select id="sid-decision" className="input" value={decisionKind} onChange={(e) => setDecisionKind(e.target.value as DecisionKind)}>
               <option value="standard">standard (60% yes)</option>
               <option value="important">important (90% yes)</option>
             </select>
 
             <div className="section">Search</div>
-            <input className="input" placeholder="🔍 Search posts, people…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              className="input"
+              placeholder="🔍 Search posts, people…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
 
             <div className="section">API</div>
             <div className="api">
@@ -136,7 +174,12 @@ export default function Sidebar() {
               <input type="checkbox" checked={useReal} onChange={(e) => setUseReal(e.target.checked)} />
               <span>Use real backend</span>
             </label>
-            <input className="input" placeholder="http://127.0.0.1:8000" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} />
+            <input
+              className="input"
+              placeholder="http://127.0.0.1:8000"
+              value={backendUrl}
+              onChange={(e) => setBackendUrl(e.target.value)}
+            />
 
             <div className="section">Workspaces</div>
             <button className="btn" onClick={() => goto("Test Tech")}>🏠 <span>Test Tech</span></button>
