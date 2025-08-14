@@ -1,12 +1,12 @@
+// src/components/Shell.tsx
 import React from "react";
 import Feed from "./feed/Feed";
-import Sidebar from "./Sidebar";
 import World3D from "./World3D";
 import AssistantOrb from "./AssistantOrb";
-import ChatDock from "./ChatDock"; // keep for future
+import ChatDock from "./ChatDock";
 import Topbar from "./Topbar";
-import AvatarPortal from "./AvatarPortal";
-import "./Shell.css";
+import Sidebar from "./Sidebar";
+import PortalOverlay from "./PortalOverlay";
 
 export default function Shell() {
   return (
@@ -17,7 +17,7 @@ export default function Shell() {
 
       <Topbar />
       <Sidebar />
-      <AvatarPortal />
+      <PortalOverlay />
 
       <main className="feed-viewport">
         <Feed />
