@@ -2,9 +2,10 @@
 import React from "react";
 import Shell from "./components/Shell";
 
-// make sure your global styles are loaded
-import "./index.css";
-import "./styles.css";
+// Global styles
+import "./styles.css";     // reset + theme + orb + chatdock + layout
+import "./feed.css";       // feed container grid
+import "./postcard.css";   // your full-bleed PostCard styling (frost bars, chips)
 
 export default function App() {
   return <Shell />;
