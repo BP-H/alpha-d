@@ -1,15 +1,9 @@
-const KEY = "sn_apiKey";
-
-export function getApiKey(): string {
+export function load<T>(key: string, fallback: T): T {
   try {
-    return localStorage.getItem(KEY) || "";
-  } catch {
-    return "";
-  }
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch { return fallback; }
 }
-
-export function setApiKey(v: string) {
-  try {
-    localStorage.setItem(KEY, v);
-  } catch {}
+export function save<T>(key: string, value: T) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
