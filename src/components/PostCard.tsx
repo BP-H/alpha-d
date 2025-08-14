@@ -1,6 +1,7 @@
 // src/components/PostCard.tsx
 import "./postcard.css";
 import type { Post, User } from "../types";
+import { sharePost } from "../lib/share";
 
 type Props = {
   post: Post;
@@ -40,7 +41,7 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
             <button className="pc-act">
               <span className="ico comment" /> Comment
             </button>
-            <button className="pc-act">
+            <button className="pc-act" onClick={() => sharePost(post)}>
               <span className="ico share" /> Share
             </button>
             <button className="pc-act" onClick={() => onEnterWorld?.()}>
