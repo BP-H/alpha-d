@@ -1,15 +1,13 @@
-// src/lib/placeholders.ts
-export const ME = {
+import type { Post } from "../types";
+
+export const currentUser = {
   id: "me",
   name: "You",
   handle: "@you",
   avatar: "/avatar.jpg",
 } as const;
 
-export const me = ME;
-export const currentUser = ME;
-
-export const demoPosts = [
+export const demoPosts: Post[] = [
   {
     id: "p-01",
     author: "@orbital",
@@ -17,6 +15,7 @@ export const demoPosts = [
     title: "Glassy postcards over a living world",
     time: "2m",
     images: ["/vite.svg"],
+    location: "superNova",
   },
   {
     id: "p-02",
@@ -25,6 +24,7 @@ export const demoPosts = [
     title: "Scroll the void",
     time: "12m",
     images: ["/vite.svg"],
+    location: "superNova",
   },
   {
     id: "p-03",
@@ -33,5 +33,6 @@ export const demoPosts = [
     title: "XR ready",
     time: "1h",
     images: ["/vite.svg"],
+    location: "superNova",
   },
 ];
