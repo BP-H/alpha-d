@@ -1,32 +1,17 @@
-// src/lib/bus.ts
-type Handler<T = any> = (payload: T) => void;
+type Handler = (payload?: any) => void;
+const listeners = new Map<string, Set<Handler>>();
 
-const map = new Map<string, Set<Handler>>();
-
-export type Unsubscribe = () => void;
-
-export function on<T = any>(name: string, fn: Handler<T>): Unsubscribe {
-  let set = map.get(name);
-  if (!set) {
-    set = new Set();
-    map.set(name, set);
-  }
-  set.add(fn as Handler);
-  // IMPORTANT: return void, not boolean
-  return () => {
-    const s = map.get(name);
-    if (s) s.delete(fn as Handler);
-  };
+export function on(event: string, handler: Handler) {
+  if (!listeners.has(event)) listeners.set(event, new Set());
+  listeners.get(event)!.add(handler);
+  return () => off(event, handler);
 }
-
-export function emit<T = any>(name: string, payload: T): void {
-  map.get(name)?.forEach((fn) => {
-    try {
-      fn(payload);
-    } catch {
-      // swallow listener errors
-    }
+export function off(event: string, handler: Handler) {
+  listeners.get(event)?.delete(handler);
+}
+export function emit(event: string, payload?: any) {
+  listeners.get(event)?.forEach(fn => {
+    try { fn(payload); } catch (e) { console.error(e); }
   });
 }
-
-export default { on, emit };
+export default { on, off, emit };
