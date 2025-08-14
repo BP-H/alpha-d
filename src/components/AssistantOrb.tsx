@@ -14,10 +14,22 @@ declare global {
 
 type SpeechRecognitionLike = any;
 const clamp = (n:number,a:number,b:number) => Math.min(b, Math.max(a, n));
+const ORB_SIZE = 76;
+const ORB_RADIUS = ORB_SIZE / 2;
 
 export default function AssistantOrb(){
   // position
-  const [pos, setPos] = useState(() => ({ x: window.innerWidth - 76, y: window.innerHeight - 76 }));
+  const [pos, setPos] = useState(() => ({ x: window.innerWidth - ORB_SIZE, y: window.innerHeight - ORB_SIZE }));
+  useEffect(() => {
+    const onResize = () => {
+      setPos(p => ({
+        x: clamp(p.x, 0, window.innerWidth - ORB_SIZE),
+        y: clamp(p.y, 0, window.innerHeight - ORB_SIZE),
+      }));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const pressRef = useRef<{ id:number; x:number; y:number } | null>(null);
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
@@ -49,8 +61,8 @@ export default function AssistantOrb(){
     if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
     movedRef.current = true;
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-    const nx = clamp(e.clientX - 38, 0, window.innerWidth - 76);
-    const ny = clamp(e.clientY - 38, 0, window.innerHeight - 76);
+    const nx = clamp(e.clientX - ORB_RADIUS, 0, window.innerWidth - ORB_SIZE);
+    const ny = clamp(e.clientY - ORB_RADIUS, 0, window.innerHeight - ORB_SIZE);
     setPos({ x: nx, y: ny });
 
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
