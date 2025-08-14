@@ -6,7 +6,7 @@ export async function askLLM(input: string, ctx?: Record<string, unknown>): Prom
     const res = await fetch("/api/assistant-reply", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ input, ctx }),
+      body: JSON.stringify({ prompt: input, ctx }),
     });
     if (res.ok) {
       const data = await res.json();
