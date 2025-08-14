@@ -48,7 +48,10 @@ export default function AssistantOrb(){
 
   // context post
   const [ctxPost, setCtxPost] = useState<Post | null>(null);
-  useEffect(() => bus.on("feed:hover", (p: { post: Post }) => setCtxPost(p.post)), []);
+  useEffect(() => {
+    const off = bus.on("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
+    return () => off();
+  }, []);
 
   useEffect(() => {
     return () => {
