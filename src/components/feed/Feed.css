@@ -1,0 +1,14 @@
+/* src/components/feed/Feed.css */
+:root {
+  --post-gap: 16px;
+}
+
+.content-viewport.feed-wrap {
+  /* Make the feed its own scrolling area above the 3D layer */
+  overflow: auto;
+  height: 100vh;
+}
+
+.feed-content {
+  position: relative;
+}

@@ -1,0 +1,68 @@
+.orb {
+  position: fixed;
+  z-index: 50;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 0;
+  background: radial-gradient(38% 38% at 35% 35%, #ffffff 0%, #ffd6ff 12%, rgba(255, 0, 180, 0.35) 45%, rgba(120, 0, 255, 0.38) 70%, rgba(20, 0, 40, 0.7) 100%);
+  box-shadow:
+    0 0 40px rgba(255, 0, 200, 0.35),
+    0 0 80px rgba(120, 0, 255, 0.25),
+    inset 0 -8px 26px rgba(0, 0, 0, 0.35),
+    inset 0 10px 20px rgba(255, 255, 255, 0.25);
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  transition: box-shadow 180ms ease, filter 180ms ease, transform 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.orb.dragging { cursor: grabbing; filter: saturate(1.1) brightness(1.05); }
+.orb:active { transform: scale(0.98); }
+
+.orb-core {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(30% 30% at 40% 30%, rgba(255,255,255,0.85), rgba(255,255,255,0) 60%),
+              radial-gradient(60% 60% at 60% 65%, rgba(255, 40, 200, 0.35), rgba(0,0,0,0) 70%);
+  mix-blend-mode: screen;
+  filter: blur(0.3px);
+}
+
+.orb-sheen {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(255,255,255,0.9), rgba(255,255,255,0) 55%),
+    radial-gradient(140% 110% at 110% 30%, rgba(124,131,255,0.35), rgba(255,255,255,0) 60%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.orb.listening {
+  transform: scale(1.08) translateZ(0);
+  box-shadow:
+    0 0 60px rgba(255, 0, 200, 0.55),
+    0 0 140px rgba(120, 0, 255, 0.45),
+    inset 0 -10px 28px rgba(0,0,0,0.35),
+    inset 0 12px 24px rgba(255,255,255,0.3);
+}
+
+.orb-pulse {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(255,0,200,0.28), rgba(120,0,255,0.18) 60%, rgba(0,0,0,0) 70%);
+  animation: pulse 1.35s ease-in-out infinite;
+  filter: blur(6px);
+  pointer-events: none;
+}
+@keyframes pulse {
+  0%   { transform: scale(0.9); opacity: .8; }
+  50%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(0.9); opacity: .8; }
+}
