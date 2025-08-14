@@ -1,12 +1,12 @@
-/* src/components/feed/Feed.css */
 :root {
-  --post-gap: 16px;
+  /* Slight gap between posts and around edges for background bleed */
+  --post-gap: 2px;
 }
 
 .content-viewport.feed-wrap {
-  /* Make the feed its own scrolling area above the 3D layer */
+  /* Make the feed its own scrolling area above the 3D world layer */
   overflow: auto;
-  height: 100vh;
+  height: 100dvh;
 }
 
 .feed-content {
