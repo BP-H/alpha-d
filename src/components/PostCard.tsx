@@ -11,16 +11,26 @@ type Props = {
 };
 
 export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
-  const img = (post as any).images?.[0] || "/vite.svg";
+  const img = (post as any).images?.[0];
+  const video = (post as any).video as string | undefined;
+  const mediaFallback = "/vite.svg";
 
   return (
     <article className="pc" data-post-id={(post as any).id}>
       {/* media */}
       <div className="pc-media">
-        <img src={img} alt="" loading="lazy" />
+        {video ? (
+          <video src={video} controls playsInline preload="metadata" />
+        ) : (
+          <img src={img || mediaFallback} alt="" loading="lazy" />
+        )}
         {/* frosted top bar */}
         <div className="pc-topbar">
-          <div className="pc-ava" onClick={() => onOpenProfile?.((post as any).author || "")} role="button" />
+          <div
+            className="pc-ava"
+            onClick={() => onOpenProfile?.((post as any).author || "")}
+            role="button"
+          />
           <div className="pc-meta">
             <div className="pc-handle">{(post as any).author || "@someone"}</div>
             <div className="pc-sub">{(post as any).time || "now"}</div>
@@ -31,7 +41,10 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
         {/* frosted bottom bar */}
         <div className="pc-botbar">
           <div className="pc-actions">
-            <button className="pc-act profile" onClick={() => onOpenProfile?.((post as any).author || "")}>
+            <button
+              className="pc-act profile"
+              onClick={() => onOpenProfile?.((post as any).author || "")}
+            >
               <span className="ico" />
               {(post as any).author || "Profile"}
             </button>
@@ -41,7 +54,7 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
             <button className="pc-act">
               <span className="ico comment" /> Comment
             </button>
-            <button className="pc-act" onClick={() => sharePost(post)}>
+            <button className="pc-act" onClick={() => sharePost(post as any)}>
               <span className="ico share" /> Share
             </button>
             <button className="pc-act" onClick={() => onEnterWorld?.()}>
