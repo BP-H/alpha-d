@@ -1,9 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "env": {
-    "VITE_UNSPLASH_KEY": "@unsplash-key",
-    "VITE_PEXELS_KEY": "@pexels-key"
-  }
+  "framework": "vite"
 }
