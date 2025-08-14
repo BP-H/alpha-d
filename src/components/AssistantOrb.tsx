@@ -13,12 +13,13 @@ declare global {
 }
 
 type SpeechRecognitionLike = any;
-const clamp = (n:number,a:number,b:number) => Math.min(b, Math.max(a, n));
+const ORB_SIZE = 76;
+const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
 
 export default function AssistantOrb(){
   // position
-  const [pos, setPos] = useState(() => ({ x: window.innerWidth - 76, y: window.innerHeight - 76 }));
-  const pressRef = useRef<{ id:number; x:number; y:number } | null>(null);
+  const [pos, setPos] = useState(() => ({ x: window.innerWidth - ORB_SIZE, y: window.innerHeight - ORB_SIZE }));
+  const pressRef = useRef<{ id:number; sx:number; sy:number; ox:number; oy:number } | null>(null);
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
@@ -38,19 +39,26 @@ export default function AssistantOrb(){
   // drag/hold to talk
   function onDown(e: React.PointerEvent<HTMLButtonElement>){
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    pressRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    pressRef.current = {
+      id: e.pointerId,
+      sx: e.clientX,
+      sy: e.clientY,
+      ox: e.clientX - pos.x,
+      oy: e.clientY - pos.y,
+    };
     movedRef.current = false;
-    holdTimerRef.current = window.setTimeout(() => { suppressClickRef.current = true; startListening(); }, 280) as unknown as number;
+    holdTimerRef.current = window.setTimeout(() => { suppressClickRef.current = true; startListening(); }, 150) as unknown as number;
   }
   function onMove(e: React.PointerEvent<HTMLButtonElement>){
-    if (!pressRef.current) return;
-    const dx = e.clientX - pressRef.current.x;
-    const dy = e.clientY - pressRef.current.y;
-    if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
+    const p = pressRef.current;
+    if (!p) return;
+    const dx = e.clientX - p.sx;
+    const dy = e.clientY - p.sy;
+    if (!movedRef.current && Math.hypot(dx, dy) < 3) return;
     movedRef.current = true;
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-    const nx = clamp(e.clientX - 38, 0, window.innerWidth - 76);
-    const ny = clamp(e.clientY - 38, 0, window.innerHeight - 76);
+    const nx = clamp(e.clientX - p.ox, window.innerWidth - ORB_SIZE);
+    const ny = clamp(e.clientY - p.oy, window.innerHeight - ORB_SIZE);
     setPos({ x: nx, y: ny });
 
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
