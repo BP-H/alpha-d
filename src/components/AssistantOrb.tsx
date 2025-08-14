@@ -4,6 +4,7 @@ import bus from "../lib/bus";
 import { askLLM, imageToVideo } from "../lib/assistant";
 import { localSearchPosts, webSearch } from "../lib/search";
 import type { AssistantMessage, Post, RemixSpec } from "../types";
+import "./AssistantOrb.css";
 
 declare global {
   interface Window {
