@@ -22,6 +22,9 @@ export default function AssistantOrb(){
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
+  const moveRafRef = useRef<number | null>(null);
+  const lastMoveRef = useRef<{ x:number; y:number } | null>(null);
+  const hoverIdRef = useRef<string | null>(null);
 
   // chat
   const [open, setOpen] = useState(false);
@@ -44,25 +47,36 @@ export default function AssistantOrb(){
   }
   function onMove(e: React.PointerEvent<HTMLButtonElement>){
     if (!pressRef.current) return;
-    const dx = e.clientX - pressRef.current.x;
-    const dy = e.clientY - pressRef.current.y;
-    if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
-    movedRef.current = true;
-    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-    const nx = clamp(e.clientX - 38, 0, window.innerWidth - 76);
-    const ny = clamp(e.clientY - 38, 0, window.innerHeight - 76);
-    setPos({ x: nx, y: ny });
+    lastMoveRef.current = { x: e.clientX, y: e.clientY };
+    if (moveRafRef.current) return;
+    moveRafRef.current = requestAnimationFrame(() => {
+      moveRafRef.current = null;
+      if (!pressRef.current || !lastMoveRef.current) return;
+      const { x: cx, y: cy } = lastMoveRef.current;
+      const dx = cx - pressRef.current.x;
+      const dy = cy - pressRef.current.y;
+      if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
+      movedRef.current = true;
+      if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+      const nx = clamp(cx - 38, 0, window.innerWidth - 76);
+      const ny = clamp(cy - 38, 0, window.innerHeight - 76);
+      setPos({ x: nx, y: ny });
 
-    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
-    if (target) {
-      target.classList.add("pc-target");
-      setTimeout(() => target.classList.remove("pc-target"), 120);
-      const id = target.dataset.postId!;
-      bus.emit("feed:select-id", { id });
-    }
+      const el = document.elementFromPoint(cx, cy) as HTMLElement | null;
+      const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
+      const id = target?.dataset.postId || null;
+      if (target && id && id !== hoverIdRef.current) {
+        hoverIdRef.current = id;
+        target.classList.add("pc-target");
+        setTimeout(() => target.classList.remove("pc-target"), 120);
+        bus.emit("feed:select-id", { id });
+      } else if (!id) {
+        hoverIdRef.current = null;
+      }
+    });
   }
   function onUp(e: React.PointerEvent<HTMLButtonElement>){
+    if (moveRafRef.current) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
     const dragged = movedRef.current;
