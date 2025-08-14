@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchImages, FeedImage, ProviderName } from "../../lib/imageProviders";
 import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
+import { sharePost } from "../../hooks/useShare";
 import bus from "../../lib/bus";
 import "./infinitefeed.css";
 
@@ -100,6 +101,14 @@ export default function InfiniteFeed({
               </button>
               <button className="pc-act" data-drop="world" title="World">
                 <span className="ico world" /><span>World</span>
+              </button>
+              <button
+                className="pc-act"
+                data-drop="share"
+                title="Share"
+                onClick={() => sharePost(img.link || window.location.href, img.author)}
+              >
+                <span className="ico share" /><span>Share</span>
               </button>
               <button className="pc-act" data-drop="save" title="Save">
                 <span className="ico save" /><span>Save</span>
