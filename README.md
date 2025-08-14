@@ -18,4 +18,13 @@ You can deploy your new Vite project with a single command from your terminal us
 
 ```shell
 $ vercel
-``` 
+```
+
+## Demo posts
+
+To preview the sample posts included in [`src/lib/placeholders.ts`](src/lib/placeholders.ts) after deploying to Vercel:
+
+1. In your Vercel dashboard, open **Project Settings → Environment Variables** and add `VITE_DEMO` with a value of `1`.
+2. Redeploy the project.
+
+When `VITE_DEMO=1` is set, the app displays the placeholder posts defined in `src/lib/placeholders.ts`.
