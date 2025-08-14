@@ -40,7 +40,7 @@ export default function PortalOrb({ onAnalyzeImage }: Props) {
   }
 
   function handlePointerDown(e: React.PointerEvent) {
-    (e.target as Element).setPointerCapture(e.pointerId);
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
 
     // double-tap to snap top-left + vortex
     const now = Date.now();
