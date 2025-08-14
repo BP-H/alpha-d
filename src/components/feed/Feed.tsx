@@ -1,8 +1,7 @@
-// src/components/feed/Feed.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import PostCard from "./PostCard";
 import { useFeedStore } from "../../lib/feedStore";
-import "./feed.css";
+import "./Feed.css";
 
 const PAGE_SIZE = 9;
 const PRELOAD_THRESHOLD_PX = 800;
@@ -22,7 +21,9 @@ export default function Feed() {
 
     const onScroll = () => {
       const nearBottom = el.scrollTop + el.clientHeight > el.scrollHeight - PRELOAD_THRESHOLD_PX;
-      if (nearBottom && limit < posts.length) setLimit((n) => n + PAGE_SIZE);
+      if (nearBottom && limit < posts.length) {
+        setLimit((n) => n + PAGE_SIZE);
+      }
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
