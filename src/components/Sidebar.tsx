@@ -1,35 +1,62 @@
-// src/components/Sidebar.tsx (same as you had; minimal bus wiring)
+// src/components/Sidebar.tsx
 import React, { useEffect, useState } from "react";
+import "./Sidebar.css";
 import bus from "../lib/bus";
 
-export default function Sidebar(){
+export default function Sidebar() {
   const [open, setOpen] = useState(false);
+
   useEffect(() => {
-    const a = bus.on("sidebar:toggle", () => setOpen(v=>!v));
+    const a = bus.on("sidebar:toggle", () => setOpen((v) => !v));
     const b = bus.on("sidebar:open", () => setOpen(true));
     const c = bus.on("sidebar:close", () => setOpen(false));
-    return () => { a?.(); b?.(); c?.(); };
+    return () => {
+      a?.();
+      b?.();
+      c?.();
+    };
   }, []);
+
   return (
     <>
-      {open && <div className="snv2-scrim" onClick={() => setOpen(false)} />}
-      <aside className={`snv2 ${open ? "open" : "fab"}`}>
+      {open && <div className="snv2-scrim" onClick={() => setOpen(false)} aria-label="Close sidebar" />}
+      <aside className={`snv2 ${open ? "open" : "fab"}`} aria-hidden={!open}>
         {!open && (
           <button className="snv2-fab" onClick={() => setOpen(true)} aria-label="Open menu">
-            <img src="/avatar.jpg" alt="me" width={56} height={56} />
+            <span className="snv2-fab-core" />
           </button>
         )}
         {open && (
           <div className="snv2-panel" role="dialog" aria-modal="true">
             <div className="snv2-panel__head">
-              <button className="snv2-close" onClick={() => setOpen(false)} aria-label="Close">✕</button>
-              <div className="snv2-brand"><span className="orb"/><span className="text">superNova_2177</span></div>
+              <div className="snv2-brand">
+                <span className="orb" />
+                <span className="text">superNova_2177</span>
+              </div>
+              <button className="snv2-close" onClick={() => setOpen(false)} aria-label="Close">
+                ✕
+              </button>
             </div>
+
             <div className="section">Navigate</div>
-            <button className="btn" onClick={() => bus.emit("nav:goto", { label: "Feed" })}>🏡 <span>Feed</span></button>
-            <button className="btn" onClick={() => bus.emit("nav:goto", { label: "Metaverse" })}>🌌 <span>Enter Metaverse</span></button>
-            <div className="divider"/>
-            <button className="btn">⚙️ <span>Settings</span></button>
+            <button className="btn" onClick={() => bus.emit("nav:goto", { label: "Feed" })}>
+              🏡 <span>Feed</span>
+            </button>
+            <button
+              className="btn"
+              onClick={() => bus.emit("orb:portal", { x: 28, y: 28 })}
+              title="Fire portal"
+            >
+              🌌 <span>Enter Metaverse</span>
+            </button>
+
+            <div className="divider" />
+
+            <div className="caption">
+              Orb holds search + chat.
+              <br />
+              Tip: hold to talk, release to stop.
+            </div>
           </div>
         )}
       </aside>
