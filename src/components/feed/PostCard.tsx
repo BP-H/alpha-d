@@ -1,110 +1,98 @@
-import { useMemo, useState } from "react";
+// src/components/feed/PostCard.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import "./postcard.css";
 import type { Post } from "../../types";
 import bus from "../../lib/bus";
-import "./postcard.css";
 
-type Props = { post: Post };
-
-export default function PostCard({ post }: Props) {
+export default function PostCard({ post }: { post: Post }) {
   const [drawer, setDrawer] = useState(false);
+  const [comments, setComments] = useState<string[]>([]);
+  const [reactions, setReactions] = useState<string[]>([]);
 
-  // Media fallback (image/video/canvas → pick first image-like thing)
+  useEffect(() => {
+    const off1 = bus.on("post:comment", ({ id, body }) => {
+      if (String(id) !== String(post.id)) return;
+      setDrawer(true);
+      setComments(s => [body, ...s]);
+    });
+    const off2 = bus.on("post:react", ({ id, emoji }) => {
+      if (String(id) !== String(post.id)) return;
+      setDrawer(true);
+      setReactions(s => [emoji, ...s].slice(0, 30));
+    });
+    const off3 = bus.on("post:focus", ({ id }) => {
+      if (String(id) !== String(post.id)) return;
+      setDrawer(true);
+    });
+    const off4 = bus.on("feed:select-id", ({ id }) => {
+      // highlight when orb hovers/drag
+      if (String(id) === String(post.id)) {
+        // optional: visual changes
+      }
+    });
+    return () => { off1?.(); off2?.(); off3?.(); off4?.(); };
+  }, [post.id]);
+
   const mediaSrc = useMemo(() => {
-    const img = (post as any)?.images?.[0] || (post as any)?.image || (post as any)?.cover;
+    const img = post?.images?.[0] || post?.image || post?.cover;
     if (typeof img === "string") return img;
-    if (img?.url) return img.url;
+    if ((img as any)?.url) return (img as any).url as string;
     return "/vite.svg";
   }, [post]);
 
-  const handleWorld = () => {
-    // Fire the same portal bus event your orb/portal flow already uses
-    const x = window.innerWidth - 56;
-    const y = window.innerHeight - 56;
-    bus.emit("orb:portal", { post, x, y });
-    if (mediaSrc) {
-      try {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = mediaSrc;
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          canvas.width = 1;
-          canvas.height = 1;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, 1, 1);
-            const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-            const hex = "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
-            bus.emit("world:update", { orbColor: hex });
-          }
-        };
-        img.onerror = () => {
-          bus.emit("world:update", { orbColor: "#7dd3fc" });
-        };
-      } catch {}
-    }
-  };
-
   return (
-    <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post.id || "")}>
-      {/* Optional glowing badge in the top-left */}
+    <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
-      
-      {/* Media */}
       <div className="pc-media">
-        {/* Full-bleed image/video — keep aspect via natural size */}
-        <img src={mediaSrc} alt={post.title || post.author || "post"} loading="lazy" />
-        {/* Frosted top bar */}
+        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+
         <div className="pc-topbar">
-          <div className="pc-ava" title={post.author}>
-            <img src={(post as any).authorAvatar || "/avatar.jpg"} alt={post.author || "user"} />
+          <div className="pc-ava" title={post?.author}>
+            <img src={post?.authorAvatar || "/avatar.jpg"} alt={post?.author || "user"} />
           </div>
           <div className="pc-meta">
-            <div className="pc-handle">{post.author || "@user"}</div>
-            <div className="pc-sub">{(post as any).time || "now"} • {(post as any).location || "superNova"}</div>
+            <div className="pc-handle">{post?.author || "@user"}</div>
+            <div className="pc-sub">{post?.time || "now"} • {post?.location || "superNova"}</div>
           </div>
-          {post.title && <div className="pc-title">{post.title}</div>}
+          {post?.title && <div className="pc-title">{post.title}</div>}
         </div>
 
-        {/* Frosted bottom bar with 5 minimal chips */}
         <div className="pc-botbar">
           <div className="pc-actions">
             <button className="pc-act profile" title="Profile">
               <span className="ico" aria-hidden />
-              <span>{post.author?.replace("@", "") || "profile"}</span>
+              <span>{post?.author?.replace?.("@","") || "profile"}</span>
             </button>
-
-            <button className="pc-act" onClick={() => setDrawer((v) => !v)} title="Like">
-              <span className="ico heart" />
-              <span>Like</span>
+            <button className="pc-act" onClick={() => setDrawer(v => !v)} title="Like">
+              <span className="ico heart" /><span>Like</span>
             </button>
-
-            <button className="pc-act" onClick={() => setDrawer((v) => !v)} title="Comment">
-              <span className="ico comment" />
-              <span>Comment</span>
+            <button className="pc-act" onClick={() => setDrawer(v => !v)} title="Comment">
+              <span className="ico comment" /><span>Comment</span>
             </button>
-
-            <button className="pc-act" onClick={handleWorld} title="Enter world">
-              <span className="ico world" />
-              <span>World</span>
+            <button className="pc-act" title="World" onClick={() => bus.emit("orb:portal", { post, x: 0, y: 0 })}>
+              <span className="ico world" /><span>World</span>
             </button>
-
             <button className="pc-act" title="Save">
-              <span className="ico save" />
-              <span>Save</span>
+              <span className="ico save" /><span>Save</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Slide-out drawer (comments/composer/etc.) */}
       <div className="pc-drawer">
-        {/* Keep this simple for now; you can mount your composer here later */}
-        <div style={{ padding: "14px 18px" }}>
-          <strong>Quick actions</strong>
-          <div style={{ opacity: 0.8, marginTop: 6 }}>
-            This space is for comments, emoji tray, or remix prompts.
+        <div style={{ padding: "12px 18px 0" }}>
+          <strong>Reactions</strong>
+          <div style={{ marginTop: 8, display: "flex", gap:8, flexWrap:"wrap" }}>
+            {reactions.length ? reactions.map((e, i) => <span key={i} style={{ fontSize:20 }}>{e}</span>) : <span style={{opacity:.7}}>—</span>}
           </div>
+        </div>
+        <div style={{ padding: "12px 18px" }}>
+          <strong>Comments</strong>
+          {comments.length ? (
+            <ul style={{ margin:"8px 0 0", padding:0, listStyle:"none", display:"grid", gap:6 }}>
+              {comments.map((c, i) => <li key={i} style={{ opacity:.95, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.12)", padding:"8px 10px", borderRadius:10 }}>{c}</li>)}
+            </ul>
+          ) : <div style={{ opacity:.7, marginTop:8 }}>—</div>}
         </div>
       </div>
     </article>
