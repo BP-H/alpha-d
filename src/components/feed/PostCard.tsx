@@ -18,19 +18,13 @@ export default function PostCard({ post }: { post: Post }) {
     const off2 = bus.on("post:react", ({ id, emoji }) => {
       if (String(id) !== String(post.id)) return;
       setDrawer(true);
-      setReactions(s => [emoji, ...s].slice(0, 30));
+      setReactions(s => [emoji, ...s].slice(0, 40));
     });
     const off3 = bus.on("post:focus", ({ id }) => {
       if (String(id) !== String(post.id)) return;
       setDrawer(true);
     });
-    const off4 = bus.on("feed:select-id", ({ id }) => {
-      // highlight when orb hovers/drag
-      if (String(id) === String(post.id)) {
-        // optional: visual changes
-      }
-    });
-    return () => { off1?.(); off2?.(); off3?.(); off4?.(); };
+    return () => { off1?.(); off2?.(); off3?.(); };
   }, [post.id]);
 
   const mediaSrc = useMemo(() => {
