@@ -1,7 +1,7 @@
+// src/lib/assistant.ts
 import type { AssistantMessage, RemixSpec } from "../types";
 
 export async function askLLM(input: string, ctx?: Record<string, unknown>): Promise<AssistantMessage> {
-  // Try your backend first
   try {
     const res = await fetch("/api/assistant-reply", {
       method: "POST",
@@ -13,8 +13,7 @@ export async function askLLM(input: string, ctx?: Record<string, unknown>): Prom
       return { id: crypto.randomUUID(), role: "assistant", text: data.text || "ok", ts: Date.now() };
     }
   } catch {}
-
-  // Fallback: local echo (compiles offline)
+  // offline stub so builds never fail
   return { id: crypto.randomUUID(), role: "assistant", text: `💡 stub: “${input}”`, ts: Date.now() };
 }
 
