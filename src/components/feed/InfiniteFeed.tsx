@@ -3,6 +3,7 @@ import { fetchImages, FeedImage, ProviderName } from "../../lib/imageProviders";
 import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
 import bus from "../../lib/bus";
 import "./infinitefeed.css";
+import SkeletonCard from "./SkeletonCard";
 
 /**
  * InfiniteFeed
@@ -108,6 +109,11 @@ export default function InfiniteFeed({
           </div>
         </article>
       ))}
+
+      {loading &&
+        Array.from({ length: perPage }).map((_, i) => (
+          <SkeletonCard key={`skeleton-${i}`} />
+        ))}
 
       {/* sentinel for infinite scroll */}
       <div ref={sentinelRef} className="if-sentinel">
