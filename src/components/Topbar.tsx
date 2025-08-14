@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef } from "react";
 import bus from "../lib/bus";
+import ExternalAccountControls from "./ExternalAccountControls";
 
 export default function Topbar(){
   const ref = useRef<HTMLElement|null>(null);
@@ -35,10 +36,22 @@ export default function Topbar(){
       {/* Center: brand text */}
       <div style={{ fontWeight:900, letterSpacing:.3 }}>superNova_2177</div>
 
-      {/* Right actions kept minimal — orb handles search */}
+      {/* Right actions: external account controls + menu */}
       <div style={{ display:"flex", gap:8 }}>
-        <button onClick={() => bus.emit("sidebar:toggle")} aria-label="Menu"
-          style={{ width:40, height:40, borderRadius:10, background:"rgba(255,255,255,.08)", border:"1px solid rgba(255,255,255,.14)" }}>≡</button>
+        <ExternalAccountControls />
+        <button
+          onClick={() => bus.emit("sidebar:toggle")}
+          aria-label="Menu"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: "rgba(255,255,255,.08)",
+            border: "1px solid rgba(255,255,255,.14)",
+          }}
+        >
+          ≡
+        </button>
       </div>
     </header>
   );
