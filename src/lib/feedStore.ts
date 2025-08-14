@@ -13,7 +13,10 @@ export const useFeedStore = create<FeedState>((set) => ({
 
 export function usePaginatedPosts(page: number, pageSize: number) {
   return useFeedStore((state) => {
-    const start = (page - 1) * pageSize;
-    return state.posts.slice(start, start + pageSize);
+    const p = Math.max(1, Math.floor(page));
+    const size = Math.max(1, Math.floor(pageSize));
+    const start = (p - 1) * size;
+    if (start >= state.posts.length) return [];
+    return state.posts.slice(start, start + size);
   });
 }
