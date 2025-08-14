@@ -17,8 +17,17 @@ type FetchArgs = {
   query?: string;
 };
 
-/** Read optional API keys from localStorage (so you don’t need env vars to test) */
+/**
+ * Read API keys from Vite env first, then fall back to localStorage
+ * (so you don’t need env vars to test)
+ */
 function getKey(name: string) {
+  const envMap: Record<string, string | undefined> = {
+    unsplash: import.meta.env.VITE_UNSPLASH_KEY,
+    pexels: import.meta.env.VITE_PEXELS_KEY,
+  };
+  const envKey = envMap[name];
+  if (envKey) return envKey;
   try { return JSON.parse(localStorage.getItem("sn.keys") || "{}")[name]; } catch { return undefined; }
 }
 
