@@ -15,8 +15,8 @@ button,input,textarea,select{font:inherit;color:inherit}
   --glass-accent: rgba(15,120,255,0.06);
   --glass: color-mix(in srgb, rgba(255,255,255,0.9) 40%, var(--glass-base) 60%);
   --glass-strong: color-mix(in srgb, rgba(255,255,255,0.95) 45%, var(--glass-base) 55%);
-  --post-gap:1px;
-  --feed-max:100%;
+  --feed-max: min(100%, 1200px);
+  --post-gap: 2px;
   --stripe-h:64px;
   --orb-size:64px;
 }
@@ -39,13 +39,6 @@ button,input,textarea,select{font:inherit;color:inherit}
   0%{ filter:saturate(120%) hue-rotate(0deg); }
   100%{ filter:saturate(140%) hue-rotate(25deg); }
 }
-
-/* =========================
-   Feed layout (above world)
-   ========================= */
-.content-viewport{height:100dvh;overflow:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:10}
-.feed-wrap{padding:8px 0 80px}
-.feed-content{width:var(--feed-max);margin:0 auto;display:grid;gap:var(--post-gap);padding:0}
 
 /* (Optional) Post skeleton bits you may already use */
 .post{display:grid;grid-template-rows:auto auto auto;gap:0;background:transparent}
@@ -183,4 +176,3 @@ button,input,textarea,select{font:inherit;color:inherit}
 .portal-overlay.on{ --r0: 160vmax; opacity:1; }
 
 /* Topbar offset for the scroller */
-.feed-viewport{ padding-top: var(--topbar-h, 56px); }

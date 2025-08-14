@@ -1,10 +1,5 @@
 /* Topbar offset (computed in Topbar.tsx) */
 .feed-viewport {
-  position: relative;
-  z-index: 10;
-  height: 100dvh;
-  overflow: auto;
-  padding: 8px 0 100px;
   padding-top: var(--topbar-h, 56px);
 }
 

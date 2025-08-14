@@ -4,6 +4,7 @@ import PostCard from "./PostCard";
 import { demoPosts } from "../../lib/placeholders";
 import bus from "../../lib/bus";
 import type { Post } from "../../types";
+import "./Feed.css";
 
 const PAGE = 9;
 const PRELOAD_PX = 800;
