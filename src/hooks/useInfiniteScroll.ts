@@ -8,7 +8,12 @@ export function useInfiniteScroll<T>(opts: {
   const { loadMore, hasMore = true, rootMargin = "1200px 0px" } = opts;
   const [items, setItems] = useState<T[]>([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoadingState] = useState(false);
+  const loadingRef = useRef(loading);
+  const setLoading = (value: boolean) => {
+    loadingRef.current = value;
+    setLoadingState(value);
+  };
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -16,7 +21,7 @@ export function useInfiniteScroll<T>(opts: {
     let cancelled = false;
     const io = new IntersectionObserver(async (entries) => {
       const e = entries[0];
-      if (!e.isIntersecting || loading || !hasMore) return;
+      if (!e.isIntersecting || loadingRef.current || !hasMore) return;
       setLoading(true);
       try {
         const next = await loadMore();
@@ -33,7 +38,7 @@ export function useInfiniteScroll<T>(opts: {
     const node = sentinelRef.current;
     if (node) io.observe(node);
     return () => { cancelled = true; io.disconnect(); };
-  }, [loadMore, hasMore, rootMargin, loading]);
+  }, [loadMore, hasMore, rootMargin]);
 
   return { items, setItems, page, setPage, loading, error, sentinelRef };
 }
