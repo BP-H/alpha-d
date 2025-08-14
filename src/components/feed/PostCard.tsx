@@ -1,4 +1,3 @@
-// src/components/feed/PostCard.tsx
 import { useMemo, useState } from "react";
 import type { Post } from "../../types";
 import bus from "../../lib/bus";
@@ -19,15 +18,38 @@ export default function PostCard({ post }: Props) {
 
   const handleWorld = () => {
     // Fire the same portal bus event your orb/portal flow already uses
-    const x = window.innerWidth - 56, y = window.innerHeight - 56;
+    const x = window.innerWidth - 56;
+    const y = window.innerHeight - 56;
     bus.emit("orb:portal", { post, x, y });
+    if (mediaSrc) {
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = mediaSrc;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1;
+          canvas.height = 1;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, 1, 1);
+            const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+            const hex = "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("");
+            bus.emit("world:update", { orbColor: hex });
+          }
+        };
+        img.onerror = () => {
+          bus.emit("world:update", { orbColor: "#7dd3fc" });
+        };
+      } catch {}
+    }
   };
 
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post.id || "")}>
       {/* Optional glowing badge in the top-left */}
       <div className="pc-badge" aria-hidden />
-
+      
       {/* Media */}
       <div className="pc-media">
         {/* Full-bleed image/video — keep aspect via natural size */}
