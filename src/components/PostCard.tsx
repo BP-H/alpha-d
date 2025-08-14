@@ -1,76 +1,84 @@
-import { useState } from "react";
-import { Post, User } from "../types";
+// src/components/PostCard.tsx
+import React, { useState } from "react";
+import type { Post } from "./feed/Feed";
 
-type Props = {
-  post: Post;
-  me: User;
-  onOpenProfile?: (id: string) => void;
-  onEnterWorld?: () => void;
-};
-
-export default function PostCard({ post, me, onOpenProfile, onEnterWorld }: Props) {
+export default function PostCard({ post }: { post: Post }) {
   const [open, setOpen] = useState(false);
 
-  // Resolve first image URL (supports string or {url})
-  const first = post.images?.[0] as any;
-  const imgUrl: string = typeof first === "string" ? first : first?.url ?? "";
-  const imgAlt: string = typeof first === "object" && first?.alt ? first.alt : (post.title ?? "");
-
   return (
-    <article className="post" aria-label={post.title ?? post.author}>
-      {/* Frost TOP (flush) */}
-      <div className="frost frost-top">
-        <button
-          className="avatar-circle"
-          style={{ backgroundImage: `url(${post.authorAvatar})` }}
-          aria-label={`Open ${post.author}'s profile`}
-          onClick={() => onOpenProfile?.(post.id)}
-        />
-        <div className="author">
-          <div className="name">{post.author}</div>
-          <div className="time">{post.time}</div>
+    <article
+      className={`pc post-card ${open ? "dopen" : ""}`}
+      data-post-id={post.id}
+      aria-label={post.title}
+    >
+      <div className="pc-media">
+        <img src={post.image} alt={post.title} loading="lazy" />
+
+        {/* Frosted top bar */}
+        <div className="pc-topbar">
+          <div className="pc-ava">
+            <img src={post.authorAvatar} alt="" />
+          </div>
+          <div className="pc-meta">
+            <div className="pc-handle">{post.author}</div>
+            <div className="pc-sub">{post.time}</div>
+          </div>
+          <div className="pc-title">{post.title}</div>
         </div>
-        {post.title && <span className="chip">{post.title}</span>}
-      </div>
 
-      {/* Media (real height; bg + hidden img) */}
-      <div
-        className="post-media"
-        style={{ backgroundImage: imgUrl ? `url(${imgUrl})` : undefined }}
-      >
-        {imgUrl && (
-          <img
-            src={imgUrl}
-            alt={imgAlt}
-            width={800}
-            height={1000}
-            loading="lazy"
-            decoding="async"
-          />
-        )}
-      </div>
+        {/* Frosted bottom bar */}
+        <div className="pc-botbar">
+          <div className="pc-actions">
+            <button className="pc-act profile" aria-label="Profile">
+              <span className="ico" />
+              <span>Profile</span>
+            </button>
+            <button className="pc-act" aria-label="Like">
+              <span className="ico heart" />
+              <span>Like</span>
+            </button>
+            <button className="pc-act" aria-label="Comment">
+              <span className="ico comment" />
+              <span>Comment</span>
+            </button>
+            <button className="pc-act" aria-label="Share">
+              <span className="ico share" />
+              <span>Share</span>
+            </button>
+            <button className="pc-act" aria-label="Save">
+              <span className="ico save" />
+              <span>Save</span>
+            </button>
+            <button
+              className="pc-act"
+              aria-label="More"
+              onClick={() => setOpen((s) => !s)}
+              title="Toggle drawer"
+            >
+              <span className="ico world" />
+              <span>More</span>
+            </button>
+          </div>
 
-      {/* Frost BOTTOM — 5 equal cells: avatar + 4 evenly spaced icons */}
-      <div className="frost frost-bottom">
-        <button
-          className="me-circle"
-          aria-label="Open your profile"
-          style={{ backgroundImage: `url(${me.avatar})` }}
-        />
-        <button className="icon-btn" aria-label="Like"><IconHeart /></button>
-        <button className="icon-btn" aria-label="Comment" onClick={() => setOpen(v => !v)}><IconChat /></button>
-        <button className="icon-btn" aria-label="Remix"><IconRemix /></button>
-        <button className="icon-btn" aria-label="Enter Universe" onClick={() => onEnterWorld?.()}><IconPortal /></button>
+          {/* Minimal slide drawer: “emoji palette” seed */}
+          <div className="pc-drawer">
+            <div style={{ padding: 12, display: "grid", gap: 8 }}>
+              <div style={{ opacity: 0.9 }}>
+                Quick reacts:{" "}
+                <span role="img" aria-label="fire">🔥</span>{" "}
+                <span role="img" aria-label="sparkles">✨</span>{" "}
+                <span role="img" aria-label="heart">❤️</span>{" "}
+                <span role="img" aria-label="eyes">👀</span>{" "}
+                <span role="img" aria-label="star">⭐</span>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                (This is intentionally simple; we’ll wire a 100‑emoji drawer and
+                menus next without changing the layout.)
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      {/* Optional drawer */}
-      <div className={`drawer ${open ? "open" : ""}`}>engagement drawer…</div>
     </article>
   );
 }
-
-/* Minimal neutral icons */
-function IconHeart(){return(<svg className="ico" viewBox="0 0 24 24"><path d="M12 21s-8-4.5-8-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.5-8 10-8 10z" fill="none" stroke="currentColor" strokeWidth="1.7"/></svg>)}
-function IconChat(){return(<svg className="ico" viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-3.3-6.5L21 5v7zM8 19l-5 2 2-5" fill="none" stroke="currentColor" strokeWidth="1.7"/></svg>)}
-function IconRemix(){return(<svg className="ico" viewBox="0 0 24 24"><path d="M4 8h10v6H4zM9 14v4l4-4" fill="none" stroke="currentColor" strokeWidth="1.7"/></svg>)}
-function IconPortal(){return(<svg className="ico" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20" fill="none" stroke="currentColor" strokeWidth="1.7"/></svg>)}
