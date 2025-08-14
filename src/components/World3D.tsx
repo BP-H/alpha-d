@@ -1,4 +1,3 @@
-// src/components/World3D.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Float, Instances, Instance, OrbitControls } from "@react-three/drei";
@@ -32,15 +31,25 @@ export function FloorGrid({ color, opacity }: { color: string; opacity: number }
   );
 }
 
-export default function World3D({ selected, onBack }: { selected: Post | null; onBack: () => void }) {
+export default function World3D({
+  selected = null,
+  onBack = () => {}
+}: {
+  selected?: Post | null;
+  onBack?: () => void;
+}) {
   const [w, setW] = useState<WorldState>(defaultWorld);
   const [players, setPlayers] = useState<Player[]>([]);
 
-  useEffect(
-    () => bus.on("world:update", (p: Partial<WorldState>) => setW((s) => clampWorld({ ...s, ...p }))),
-    []
-  );
-  useEffect(() => { fetchPlayers().then(setPlayers).catch(() => setPlayers([])); }, []);
+  useEffect(() => {
+    const off = bus.on("world:update", (p: Partial<WorldState>) => {
+      setW((s) => clampWorld({ ...s, ...p }));
+    });
+    return () => { off?.(); };
+  }, []);
+  useEffect(() => {
+    fetchPlayers().then(setPlayers).catch(() => setPlayers([]));
+  }, []);
 
   const bg = w.theme === "dark" ? "#0b0d12" : "#f6f8fb";
   const fogC = w.theme === "dark" ? "#0b0d12" : "#f1f4fa";
