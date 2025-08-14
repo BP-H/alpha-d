@@ -1,12 +1,12 @@
 // src/lib/assistant.ts
 import type { AssistantMessage, RemixSpec } from "../types";
 
-export async function askLLM(input: string, ctx?: Record<string, unknown>): Promise<AssistantMessage> {
+export async function askLLM(prompt: string, ctx?: Record<string, unknown>): Promise<AssistantMessage> {
   try {
     const res = await fetch("/api/assistant-reply", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ input, ctx }),
+      body: JSON.stringify({ prompt, ctx }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -14,7 +14,7 @@ export async function askLLM(input: string, ctx?: Record<string, unknown>): Prom
     }
   } catch {}
   // offline stub so builds never fail
-  return { id: crypto.randomUUID(), role: "assistant", text: `💡 stub: “${input}”`, ts: Date.now() };
+  return { id: crypto.randomUUID(), role: "assistant", text: `💡 stub: “${prompt}”`, ts: Date.now() };
 }
 
 export async function imageToVideo(spec: RemixSpec): Promise<{ ok: boolean; url?: string; error?: string; }> {

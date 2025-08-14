@@ -131,11 +131,11 @@ export default function AssistantOrb(){
     const push = (m: AssistantMessage) => setMsgs(s => [...s, m]);
     push({ id: crypto.randomUUID(), role:"user", text, ts:Date.now(), postId: post?.id as any });
 
-    const T = text.trim();
-    const lower = T.toLowerCase();
+    const prompt = text.trim();
+    const lower = prompt.toLowerCase();
 
     if (lower.startsWith("/search ")) {
-      const q = T.slice(8).trim();
+      const q = prompt.slice(8).trim();
       const local = localSearchPosts(q);
       push({ id: crypto.randomUUID(), role:"assistant", text: `🔎 Local (${local.length}):\n` + local.map(r => `• ${r.title}`).join("\n"), ts: Date.now() });
       const web = await webSearch(q);
@@ -143,7 +143,7 @@ export default function AssistantOrb(){
       return;
     }
     if (lower.startsWith("/comment ")) {
-      const body = T.slice(9).trim();
+      const body = prompt.slice(9).trim();
       if (post) {
         bus.emit("post:comment", { id: post.id, body });
         push({ id: crypto.randomUUID(), role:"assistant", text: `💬 Commented on ${post.id}: ${body}`, ts: Date.now(), postId: post.id as any });
@@ -151,7 +151,7 @@ export default function AssistantOrb(){
       return;
     }
     if (lower.startsWith("/react")) {
-      const emoji = T.replace("/react","").trim() || "❤️";
+      const emoji = prompt.replace("/react","").trim() || "❤️";
       if (post) {
         bus.emit("post:react", { id: post.id, emoji });
         push({ id: crypto.randomUUID(), role:"assistant", text: `✨ Reacted ${emoji} on ${post.id}`, ts: Date.now(), postId: post.id as any });
@@ -169,7 +169,7 @@ export default function AssistantOrb(){
       push({ id: crypto.randomUUID(), role:"assistant", text: r.ok ? `🎬 Remix queued: ${r.url}` : `❌ Remix failed: ${r.error}`, ts: Date.now() });
       return;
     }
-    const ans = await askLLM(T, { post });
+    const ans = await askLLM(prompt, { post });
     push(ans);
   }
 
