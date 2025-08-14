@@ -34,6 +34,9 @@ export default function AssistantOrb(){
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
+  const moveRafRef = useRef<number | null>(null);
+  const lastMoveRef = useRef<{ x:number; y:number } | null>(null);
+  const hoverIdRef = useRef<string | null>(null);
 
   // chat
   const [open, setOpen] = useState(false);
@@ -47,38 +50,64 @@ export default function AssistantOrb(){
   const [ctxPost, setCtxPost] = useState<Post | null>(null);
   useEffect(() => bus.on("feed:hover", (p: { post: Post }) => setCtxPost(p.post)), []);
 
+  useEffect(() => {
+    return () => {
+      if (moveRafRef.current !== null) cancelAnimationFrame(moveRafRef.current);
+      if (holdTimerRef.current !== null) clearTimeout(holdTimerRef.current);
+    };
+  }, []);
+
   // drag/hold to talk
   function onDown(e: React.PointerEvent<HTMLButtonElement>){
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     pressRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
     movedRef.current = false;
-    holdTimerRef.current = window.setTimeout(() => { suppressClickRef.current = true; startListening(); }, 280) as unknown as number;
+    holdTimerRef.current = window.setTimeout(() => { suppressClickRef.current = true; startListening(); }, 280);
   }
   function onMove(e: React.PointerEvent<HTMLButtonElement>){
     if (!pressRef.current) return;
-    const dx = e.clientX - pressRef.current.x;
-    const dy = e.clientY - pressRef.current.y;
-    if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
-    movedRef.current = true;
-    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-    const nx = clamp(e.clientX - ORB_RADIUS, 0, window.innerWidth - ORB_SIZE);
-    const ny = clamp(e.clientY - ORB_RADIUS, 0, window.innerHeight - ORB_SIZE);
-    setPos({ x: nx, y: ny });
+    lastMoveRef.current = { x: e.clientX, y: e.clientY };
+    if (moveRafRef.current !== null) return;
+    moveRafRef.current = requestAnimationFrame(() => {
+      moveRafRef.current = null;
+      if (!pressRef.current || !lastMoveRef.current) return;
+      const { x: cx, y: cy } = lastMoveRef.current;
+      const dx = cx - pressRef.current.x;
+      const dy = cy - pressRef.current.y;
+      if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
+      movedRef.current = true;
+      if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+      const nx = clamp(cx - ORB_RADIUS, 0, window.innerWidth - ORB_SIZE);
+      const ny = clamp(cy - ORB_RADIUS, 0, window.innerHeight - ORB_SIZE);
+      setPos({ x: nx, y: ny });
 
-    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
-    if (target) {
-      target.classList.add("pc-target");
-      setTimeout(() => target.classList.remove("pc-target"), 120);
-      const id = target.dataset.postId!;
-      bus.emit("feed:select-id", { id });
-    }
+      const el = document.elementFromPoint(cx, cy) as HTMLElement | null;
+      const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
+      const id = target?.dataset.postId || null;
+      if (id !== hoverIdRef.current) {
+        if (hoverIdRef.current) {
+          document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)?.classList.remove("pc-target");
+        }
+        hoverIdRef.current = id;
+        if (id && target) {
+          target.classList.add("pc-target");
+          bus.emit("feed:select-id", { id });
+        }
+      }
+    });
   }
   function onUp(e: React.PointerEvent<HTMLButtonElement>){
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
-    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (moveRafRef.current !== null) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
+    lastMoveRef.current = null;
     const dragged = movedRef.current;
     pressRef.current = null; movedRef.current = false;
+    const hovered = hoverIdRef.current;
+    if (hovered) {
+      document.querySelector(`[data-post-id="${hovered}"]`)?.classList.remove("pc-target");
+      hoverIdRef.current = null;
+    }
     if (mic && suppressClickRef.current) {
       stopListening();
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
