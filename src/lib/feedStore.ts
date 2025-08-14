@@ -6,7 +6,10 @@ const injected =
   typeof window !== "undefined"
     ? ((window as any).__SN_POSTS__ as Post[] | undefined)
     : undefined;
-const initialPosts = Array.isArray(injected) && injected.length ? injected : demoPosts;
+
+const initialPosts = Array.isArray(injected) && injected.length
+  ? injected
+  : demoPosts;
 
 interface FeedState {
   posts: Post[];
@@ -17,7 +20,7 @@ interface FeedState {
 export const useFeedStore = create<FeedState>((set) => ({
   posts: initialPosts,
   setPosts: (posts) => set({ posts }),
-  addPost: (post) => set((state) => ({ posts: [post, ...state.posts] })),
+  addPost: (post) => set((s) => ({ posts: [post, ...s.posts] })),
 }));
 
 export function usePaginatedPosts(page: number, pageSize: number) {
