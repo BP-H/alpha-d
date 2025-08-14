@@ -11,7 +11,7 @@
 
 /* mobile container */
 .nv-feed{
-  width: min(100%, 720px);
+  width: min(100%, 1200px);
   margin: 0 auto;
   padding: max(8px, env(safe-area-inset-top)) 0;
 }
