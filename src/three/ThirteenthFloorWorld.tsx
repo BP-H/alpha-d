@@ -134,8 +134,12 @@ function People({ people }: { people: Person[] }) {
 
       const angle = (i / Math.max(1, people.length)) * Math.PI * 2;
       const radius = 120 + (i % 5) * 24;
-      sprite.position.set(Math.cos(angle) * radius, 16 + (i % 3) * 4, Math.sin(angle) * radius);
-      (sprite as any).userData.baseY = sprite.position.y;
+      sprite.position.set(
+        Math.cos(angle) * radius,
+        16 + (i % 3) * 4,
+        Math.sin(angle) * radius
+      );
+      sprite.userData.baseY = sprite.position.y;
       g.add(sprite);
 
       // Link back to portal
@@ -157,9 +161,9 @@ function People({ people }: { people: Person[] }) {
 
   useFrame((state) => {
     const t = state.clock.getElapsedTime() * 1.2;
-    group.current.children.forEach((obj: THREE.Object3D, idx: number) => {
-      if ((obj as THREE.Sprite).isSprite) {
-        const baseY = (obj as any).userData.baseY || 16;
+    group.current.children.forEach((obj, idx) => {
+      if (obj instanceof THREE.Sprite) {
+        const baseY = obj.userData.baseY || 16;
         obj.position.y = baseY + Math.sin(t + idx) * 1.5;
       }
     });
