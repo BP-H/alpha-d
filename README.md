@@ -4,6 +4,22 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 While this project uses React, Vite supports many popular JS frameworks. [See all the supported frameworks](https://vitejs.dev/guide/#scaffolding-your-first-vite-project).
 
+## Environment Variables
+
+Fetching images from Unsplash or Pexels requires API keys. Set the following variables in your environment:
+
+- `VITE_UNSPLASH_KEY` – Unsplash access key
+- `VITE_PEXELS_KEY` – Pexels API key
+
+The app reads these values from `import.meta.env` and falls back to any keys stored in `localStorage.sn.keys` for local testing.
+
+### Adding keys on Vercel
+
+1. Open your project on [Vercel](https://vercel.com).
+2. Navigate to **Settings → Environment Variables**.
+3. Add `VITE_UNSPLASH_KEY` and `VITE_PEXELS_KEY` with their respective values.
+4. Redeploy your project to apply the new variables.
+
 ## Deploy Your Own
 
 Deploy your own Vite project with Vercel.
