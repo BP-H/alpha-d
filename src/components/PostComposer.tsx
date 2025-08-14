@@ -19,54 +19,54 @@ export default function PostComposer() {
   const addImageFiles = useCallback((files: FileList | null) => {
     if (!files || !files.length) return;
     const urls: string[] = [];
-    Array.from(files).forEach((f) => {
-      if (f.type.startsWith("image/")) {
-        urls.push(URL.createObjectURL(f));
-      }
-    });
-    if (urls.length) setImages((arr) => [...urls, ...arr]);
+    for (const f of Array.from(files)) {
+      if (f.type.startsWith("image/")) urls.push(URL.createObjectURL(f));
+    }
+    if (urls.length) setImages((arr) => [...arr, ...urls]);
   }, []);
 
   const addVideoFile = useCallback((files: FileList | null) => {
     if (!files || !files.length) return;
     const f = files[0];
     if (f && f.type.startsWith("video/")) {
-      setVideo((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(f);
-      });
+      // replace any previous selection (do not revoke here—PostCard will revoke after load)
+      setVideo(URL.createObjectURL(f));
     }
   }, []);
 
   const onPaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    const imgs: File[] = [];
+    const urls: string[] = [];
     for (const it of items) {
       if (it.type.startsWith("image/")) {
         const f = it.getAsFile();
-        if (f) imgs.push(f);
+        if (f) urls.push(URL.createObjectURL(f));
       }
     }
-    if (imgs.length) {
+    if (urls.length) {
       e.preventDefault();
-      const urls = imgs.map((f) => URL.createObjectURL(f));
-      setImages((arr) => [...urls, ...arr]);
+      setImages((arr) => [...arr, ...urls]);
     }
   }, []);
 
   function removeImage(i: number) {
     setImages((arr) => {
-      const copy = [...arr];
-      const [removed] = copy.splice(i, 1);
-      if (removed?.startsWith("blob:")) URL.revokeObjectURL(removed);
-      return copy;
+      const next = [...arr];
+      const [removed] = next.splice(i, 1);
+      // safe to revoke when user removes BEFORE posting
+      if (removed?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(removed); } catch {}
+      }
+      return next;
     });
   }
 
   function clearVideo() {
     setVideo((v) => {
-      if (v?.startsWith("blob:")) URL.revokeObjectURL(v);
+      if (v?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(v); } catch {}
+      }
       return null;
     });
     if (vidInput.current) vidInput.current.value = "";
@@ -78,6 +78,7 @@ export default function PostComposer() {
       return;
     }
     const hasText = text.trim().length > 0;
+
     const newPost: Post = {
       id: String(Date.now()),
       author: "@super",
@@ -87,15 +88,16 @@ export default function PostComposer() {
       video: video || undefined,
       link: link || undefined,
     };
+
     addPost(newPost);
 
-    // reset composer
+    // Reset UI (IMPORTANT: do NOT revoke blobs here; PostCard will revoke after load)
     setText("");
     setLink("");
-    images.forEach((u) => u.startsWith("blob:") && URL.revokeObjectURL(u));
     setImages([]);
-    clearVideo();
     if (imgInput.current) imgInput.current.value = "";
+    setVideo(null);
+    if (vidInput.current) vidInput.current.value = "";
   }
 
   return (
@@ -109,17 +111,12 @@ export default function PostComposer() {
         onPaste={onPaste}
       />
 
-      {/* attachments preview */}
       {(images.length > 0 || video) && (
         <div className="composer__attachments">
           {images.map((src, i) => (
             <div className="att" key={`img-${i}`}>
               <img src={src} alt="" />
-              <button
-                className="att__x"
-                title="Remove"
-                onClick={() => removeImage(i)}
-              >
+              <button className="att__x" title="Remove" onClick={() => removeImage(i)}>
                 ×
               </button>
             </div>
