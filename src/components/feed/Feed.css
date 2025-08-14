@@ -21,3 +21,53 @@
   padding: 0;
   position: relative;
 }
+
+/* skeleton placeholder cards */
+.if-card.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+.if-card.skeleton .sk-head,
+.if-card.skeleton .sk-media,
+.if-card.skeleton .sk-action {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.if-card.skeleton .sk-head {
+  height: 40px;
+  margin: 10px;
+  border-radius: 8px;
+}
+
+.if-card.skeleton .sk-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.if-card.skeleton .sk-actions {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px 12px;
+}
+
+.if-card.skeleton .sk-action {
+  flex: 1;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.if-card.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  animation: shimmer 1.5s infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
