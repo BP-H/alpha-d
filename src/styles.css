@@ -182,5 +182,13 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .portal-overlay.on{ --r0: 160vmax; opacity:1; }
 
-/* Topbar offset for the scroller */
-.feed-viewport{ padding-top: var(--topbar-h, 56px); }
+/* Scrolling feed above the world */
+.feed-viewport{
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 0 100px;
+  padding-top: var(--topbar-h, 56px);
+}

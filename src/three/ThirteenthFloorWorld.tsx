@@ -135,7 +135,7 @@ function People({ people }: { people: Person[] }) {
       const angle = (i / Math.max(1, people.length)) * Math.PI * 2;
       const radius = 120 + (i % 5) * 24;
       sprite.position.set(Math.cos(angle) * radius, 16 + (i % 3) * 4, Math.sin(angle) * radius);
-      // @ts-expect-error - custom data for bobbing
+      // custom data for bobbing
       sprite.userData.baseY = sprite.position.y;
       g.add(sprite);
 
@@ -160,7 +160,7 @@ function People({ people }: { people: Person[] }) {
     const t = clock.getElapsedTime() * 1.2;
     group.current.children.forEach((obj, idx) => {
       if ((obj as THREE.Sprite).isSprite) {
-        // @ts-expect-error custom data
+        // custom data
         const baseY = obj.userData.baseY || 16;
         obj.position.y = baseY + Math.sin(t + idx) * 1.5;
       }
