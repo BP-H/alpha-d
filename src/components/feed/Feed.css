@@ -1,14 +1,19 @@
-:root {
-  /* Slight gap between posts and around edges for background bleed */
-  --post-gap: 2px;
+.content-viewport {
+  height: 100dvh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* avoid page rubber-band */
+  position: relative;
+  z-index: 10; /* stays above world layer */
 }
 
-.content-viewport.feed-wrap {
-  /* Make the feed its own scrolling area above the 3D world layer */
-  overflow: auto;
-  height: 100dvh;
-}
+.feed-wrap { padding: 8px 0 80px; }
 
 .feed-content {
+  width: var(--feed-max);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--post-gap);
+  padding: 0;
   position: relative;
 }

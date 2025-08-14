@@ -1,5 +1,6 @@
 // src/components/feed/Feed.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import "./Feed.css";
 import PostCard from "./PostCard";
 import { demoPosts } from "../../lib/placeholders";
 import bus from "../../lib/bus";
