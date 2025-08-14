@@ -1,7 +1,7 @@
 .inf-feed{
   position: relative;
   z-index: 10;           /* stays above background 3D canvas */
-  width: min(820px, 100%);
+  width: min(100%, 1200px);
   margin: 72px auto 120px;
   display: grid;
   gap: 16px;
