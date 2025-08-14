@@ -36,5 +36,23 @@ export const demoPosts: Post[] = USE_DEMO
         images: ["/vite.svg"],
         location: "superNova",
       },
+      {
+        id: "p-04",
+        author: "@cosmos",
+        authorAvatar: "/avatar.jpg",
+        title: "Signals from deep space",
+        time: "2h",
+        images: ["/vite.svg"],
+        location: "superNova",
+      },
+      {
+        id: "p-05",
+        author: "@nebula",
+        authorAvatar: "/avatar.jpg",
+        title: "Painting the dark matter",
+        time: "5h",
+        images: ["/vite.svg"],
+        location: "superNova",
+      },
     ]
   : [];
