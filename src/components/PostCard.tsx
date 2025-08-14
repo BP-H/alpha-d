@@ -11,17 +11,23 @@ type Props = {
 };
 
 export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
-  const img = (post as any).images?.[0] as string | undefined;
+  // Prefer cover → image → first of images for widest compatibility
+  const img =
+    (post as any).cover ||
+    (post as any).image ||
+    ((post as any).images?.[0] as string | undefined);
   const video = (post as any).video as string | undefined;
   const mediaFallback = "/vite.svg";
 
-  const onMediaReady = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
+  const onMediaReady = (
+    e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>
+  ) => {
     const el = e.currentTarget as HTMLImageElement | HTMLVideoElement;
-    // reveal (our CSS starts at opacity:0)
+    // reveal (CSS starts at opacity: 0)
     try {
       el.style.opacity = "1";
     } catch {}
-    // revoke blob URL *after* media has loaded
+    // revoke blob URL *after* media has loaded to free memory
     const src =
       (el as HTMLImageElement).currentSrc ||
       (el as HTMLImageElement).src ||
@@ -29,9 +35,13 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
       (el as HTMLVideoElement).src ||
       "";
     if (src && src.startsWith("blob:")) {
-      try { URL.revokeObjectURL(src); } catch {}
+      try {
+        URL.revokeObjectURL(src);
+      } catch {}
     }
   };
+
+  const author = (post as any).author || "@someone";
 
   return (
     <article className="pc" data-post-id={(post as any).id}>
@@ -58,11 +68,11 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
         <div className="pc-topbar">
           <div
             className="pc-ava"
-            onClick={() => onOpenProfile?.((post as any).author || "")}
+            onClick={() => onOpenProfile?.(author)}
             role="button"
           />
           <div className="pc-meta">
-            <div className="pc-handle">{(post as any).author || "@someone"}</div>
+            <div className="pc-handle">{author}</div>
             <div className="pc-sub">{(post as any).time || "now"}</div>
           </div>
           <div className="pc-title">{(post as any).title || "Untitled"}</div>
@@ -71,19 +81,27 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
         {/* frosted bottom bar */}
         <div className="pc-botbar">
           <div className="pc-actions">
-            <button className="pc-act profile" onClick={() => onOpenProfile?.((post as any).author || "")}>
+            <button
+              className="pc-act profile"
+              onClick={() => onOpenProfile?.(author)}
+            >
               <span className="ico" />
-              {(post as any).author || "Profile"}
+              {author || "Profile"}
             </button>
+
             <button className="pc-act">
               <span className="ico heart" /> Like
             </button>
+
             <button className="pc-act">
               <span className="ico comment" /> Comment
             </button>
-            <button className="pc-act" onClick={() => sharePost({ url: post.link || window.location.href, title: post.title })}>
+
+            {/* ⬅️ FIX: pass the Post object (works with your current share.ts typing) */}
+            <button className="pc-act" onClick={() => sharePost(post)}>
               <span className="ico share" /> Share
             </button>
+
             <button className="pc-act" onClick={() => onEnterWorld?.()}>
               <span className="ico world" /> Enter
             </button>
@@ -92,7 +110,7 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
       </div>
 
       {/* optional slide drawer */}
-      <div className="pc-drawer">{/* comments or emoji drawer later */}</div>
+      <div className="pc-drawer">{/* comments / emoji later */}</div>
     </article>
   );
 }
