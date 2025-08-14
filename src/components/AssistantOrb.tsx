@@ -1,29 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import bus from "../lib/bus";
-import { askLLM, imageToVideo } from "../lib/assistant";
-import { localSearchPosts, webSearch } from "../lib/search";
 import type { AssistantMessage, Post, RemixSpec } from "../types";
-import "./AssistantOrb.css";
 
-declare global {
-  interface Window { webkitSpeechRecognition?: any; SpeechRecognition?: any; }
-}
-type SpeechRecognitionLike = any;
+/** Utility */
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 const ORB_SIZE = 76;
 const ORB_RADIUS = ORB_SIZE / 2;
 
+declare global {
+  interface Window {
+    webkitSpeechRecognition?: any;
+    SpeechRecognition?: any;
+  }
+}
+
+type SpeechRecognitionLike = any;
+
 export default function AssistantOrb() {
-  // position state for draggable orb
+  /** Position + movement */
   const [pos, setPos] = useState(() => {
     const w = typeof window !== "undefined" ? window.innerWidth : ORB_SIZE;
     const h = typeof window !== "undefined" ? window.innerHeight : ORB_SIZE;
     return { x: w - ORB_SIZE, y: h - ORB_SIZE };
   });
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const onResize = () => {
-      setPos(p => ({
+      setPos((p) => ({
         x: clamp(p.x, 0, window.innerWidth - ORB_SIZE),
         y: clamp(p.y, 0, window.innerHeight - ORB_SIZE),
       }));
@@ -39,7 +41,7 @@ export default function AssistantOrb() {
   const lastMoveRef = useRef<{ x: number; y: number } | null>(null);
   const hoverIdRef = useRef<string | null>(null);
 
-  // chat state
+  /** Drawer + chat state */
   const [open, setOpen] = useState(false);
   const [mic, setMic] = useState(false);
   const [input, setInput] = useState("");
@@ -47,29 +49,24 @@ export default function AssistantOrb() {
   const [toast, setToast] = useState("");
   const [interim, setInterim] = useState("");
 
-  // context post (for linking reactions/comments to a specific post)
+  /** Context post, updated by feed hover/selection */
   const [ctxPost, setCtxPost] = useState<Post | null>(null);
   useEffect(() => {
-    const off = bus.on("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
-    return () => off();
+    const offHover = bus.on("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
+    const offFocus = bus.on("post:focus", (p: { id: string | number }) => {
+      // could fetch and pin; for now just keep state
+    });
+    return () => { offHover?.(); offFocus?.(); };
   }, []);
 
-  useEffect(() => {
-    // Cleanup any pending timers on unmount
-    return () => {
-      if (moveRafRef.current !== null) cancelAnimationFrame(moveRafRef.current);
-      if (holdTimerRef.current !== null) clearTimeout(holdTimerRef.current);
-    };
-  }, []);
-
-  // Drag and hold-to-talk handlers for the orb
+  /** Drag + hold-to-talk handlers */
   function onDown(e: React.PointerEvent<HTMLButtonElement>) {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     pressRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
     movedRef.current = false;
-    holdTimerRef.current = window.setTimeout(() => { 
-      suppressClickRef.current = true; 
-      startListening(); 
+    holdTimerRef.current = window.setTimeout(() => {
+      suppressClickRef.current = true;
+      startListening();
     }, 280);
   }
   function onMove(e: React.PointerEvent<HTMLButtonElement>) {
@@ -84,21 +81,18 @@ export default function AssistantOrb() {
       const dy = cy - pressRef.current.y;
       if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
       movedRef.current = true;
-      if (holdTimerRef.current !== null) { 
-        clearTimeout(holdTimerRef.current); 
-        holdTimerRef.current = null; 
-      }
+      if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
       const nx = clamp(cx - ORB_RADIUS, 0, window.innerWidth - ORB_SIZE);
       const ny = clamp(cy - ORB_RADIUS, 0, window.innerHeight - ORB_SIZE);
       setPos({ x: nx, y: ny });
-      // Highlight posts when dragging orb over them
+
+      // highlight post under cursor while dragging
       const el = document.elementFromPoint(cx, cy) as HTMLElement | null;
       const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
       const id = target?.dataset.postId || null;
       if (id !== hoverIdRef.current) {
         if (hoverIdRef.current) {
-          document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)
-            ?.classList.remove("pc-target");
+          document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)?.classList.remove("pc-target");
         }
         hoverIdRef.current = id;
         if (id && target) {
@@ -116,12 +110,13 @@ export default function AssistantOrb() {
     const dragged = movedRef.current;
     pressRef.current = null;
     movedRef.current = false;
+
     const hovered = hoverIdRef.current;
     if (hovered) {
       document.querySelector(`[data-post-id="${hovered}"]`)?.classList.remove("pc-target");
       hoverIdRef.current = null;
     }
-    // If orb was held for voice and dragged onto a post, link that post
+
     if (mic && suppressClickRef.current) {
       stopListening();
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
@@ -136,34 +131,21 @@ export default function AssistantOrb() {
     }
   }
   function onClick() {
-    if (suppressClickRef.current) { 
-      suppressClickRef.current = false; 
-      return; 
-    }
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     setOpen(v => !v);
   }
 
-  // Speech recognition setup
+  /** Voice Recognition */
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const restartRef = useRef(false);
   function ensureRec(): SpeechRecognitionLike | null {
     if (recRef.current) return recRef.current;
     const C = window.webkitSpeechRecognition || window.SpeechRecognition;
-    if (!C) { 
-      setToast("Voice not supported"); 
-      return null; 
-    }
+    if (!C) { setToast("Voice not supported"); return null; }
     const rec = new C();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
+    rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
     rec.onstart = () => setToast("Listening…");
-    rec.onend = () => { 
-      setToast(""); 
-      if (restartRef.current) { 
-        try { rec.start(); } catch {} 
-      } 
-    };
+    rec.onend = () => { setToast(""); if (restartRef.current) { try { rec.start(); } catch {} } };
     rec.onerror = () => setToast("Mic error");
     rec.onresult = async (e: any) => {
       let tmp = "";
@@ -172,8 +154,7 @@ export default function AssistantOrb() {
         if (!r.isFinal) tmp += r[0]?.transcript || "";
       }
       if (tmp) setInterim(tmp.trim());
-      const finals = Array.from(e.results).filter((r: any) => r.isFinal)
-                      .map((r: any) => r?.[0]?.transcript || "");
+      const finals = Array.from(e.results).filter((r: any) => r.isFinal).map((r: any) => r?.[0]?.transcript || "");
       const final = finals.join(" ").trim();
       if (!final) return;
       setInterim("");
@@ -182,130 +163,101 @@ export default function AssistantOrb() {
     recRef.current = rec;
     return rec;
   }
-  function startListening() { 
-    const r = ensureRec(); 
-    if (!r) return; 
-    restartRef.current = true; 
-    try { r.start(); } catch {} 
-    setMic(true); 
-  }
-  function stopListening() { 
-    restartRef.current = false; 
-    try { recRef.current?.stop(); } catch {} 
-    setMic(false); 
-    setInterim(""); 
-  }
+  function startListening(){ const r = ensureRec(); if (!r) return; restartRef.current = true; try { r.start(); } catch {} setMic(true); }
+  function stopListening(){ restartRef.current = false; try { recRef.current?.stop(); } catch {} setMic(false); setInterim(""); }
 
-  // Handle commands (text input or voice)
+  /** Commands */
   async function handleCommand(text: string) {
     const post = ctxPost || null;
-    const push = (m: AssistantMessage) => setMsgs(s => [...s, m]);
-    push({ 
-      id: crypto.randomUUID(), role: "user", text, ts: Date.now(), 
-      postId: post?.id as any 
-    });
+    const push = (m: AssistantMessage) => setMsgs((s) => [...s, m]);
+
+    push({ id: crypto.randomUUID(), role: "user", text, ts: Date.now(), postId: (post?.id as any) });
+
     const T = text.trim();
     const lower = T.toLowerCase();
-    if (lower.startsWith("/search ")) {
-      const q = T.slice(8).trim();
-      const local = localSearchPosts(q);
-      push({ 
-        id: crypto.randomUUID(), role: "assistant", 
-        text: `🔎 Local (${local.length}):\n` + local.map(r => `• ${r.title}`).join("\n"), 
-        ts: Date.now() 
-      });
-      const web = await webSearch(q);
-      if (web.length) {
-        push({ 
-          id: crypto.randomUUID(), role: "assistant", 
-          text: `🌐 Web (${web.length}):\n` + web.slice(0,5).map(r => `• ${r.title}`).join("\n"), 
-          ts: Date.now() 
-        });
-      }
-      return;
-    }
-    if (lower.startsWith("/comment ")) {
-      const body = T.slice(9).trim();
-      if (post) {
-        bus.emit("post:comment", { id: post.id, body });
-        push({ 
-          id: crypto.randomUUID(), role: "assistant", 
-          text: `💬 Commented on ${post.id}: ${body}`, 
-          ts: Date.now(), postId: post.id as any 
-        });
-      } else {
-        push({ 
-          id: crypto.randomUUID(), role: "assistant", 
-          text: `⚠️ No post selected. Drag the orb over a post and release to link.`, 
-          ts: Date.now() 
-        });
-      }
-      return;
-    }
+
+    // react command
     if (lower.startsWith("/react")) {
       const emoji = T.replace("/react", "").trim() || "❤️";
       if (post) {
         bus.emit("post:react", { id: post.id, emoji });
-        push({ 
-          id: crypto.randomUUID(), role: "assistant", 
-          text: `✨ Reacted ${emoji} on ${post.id}`, 
-          ts: Date.now(), postId: post.id as any 
-        });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `✨ Reacted ${emoji} on ${post.id}`, ts: Date.now(), postId: (post.id as any) });
       } else {
-        push({ 
-          id: crypto.randomUUID(), role: "assistant", 
-          text: `⚠️ No post selected.`, ts: Date.now() 
-        });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected. Drag the orb over a post.`, ts: Date.now() });
       }
       return;
     }
-    if (lower.startsWith("/world")) {
-      bus.emit("orb:portal", { post: post || { id: "void" }, x: pos.x, y: pos.y });
-      push({ 
-        id: crypto.randomUUID(), role: "assistant", 
-        text: `🌀 Entering world…`, ts: Date.now(), postId: post?.id as any 
-      });
+
+    // comment command
+    if (lower.startsWith("/comment ")) {
+      const body = T.slice(9).trim();
+      if (post) {
+        bus.emit("post:comment", { id: post.id, body });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `💬 Commented on ${post.id}: ${body}`, ts: Date.now(), postId: (post.id as any) });
+      } else {
+        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected.`, ts: Date.now() });
+      }
       return;
     }
+
+    // remix command
     if (lower.startsWith("/remix")) {
-      const spec: RemixSpec = { kind: "image-to-video", src: (post?.images?.[0] || post?.image || post?.cover) || "/vite.svg" };
-      const r = await imageToVideo(spec);
-      push({ 
-        id: crypto.randomUUID(), role: "assistant", 
-        text: r.ok ? `🎬 Remix queued: ${r.url}` : `❌ Remix failed: ${r.error}`, 
-        ts: Date.now() 
-      });
+      // symbolic stub to your backend pipeline
+      const media = (post?.images?.[0] || (post as any)?.image || (post as any)?.cover || "/vite.svg") as string;
+      const spec: RemixSpec = { kind: "image-to-video", src: media, params: {} };
+      bus.emit("post:remix", { id: post?.id, spec }); // hook: backend picks it up
+      push({ id: crypto.randomUUID(), role: "assistant", text: `🎬 Remix queued`, ts: Date.now(), postId: (post?.id as any) });
       return;
     }
-    // Default: send to LLM for analysis
-    const ans = await askLLM(T, { post });
-    push(ans);
+
+    // world/portal command
+    if (lower.startsWith("/world")) {
+      bus.emit("orb:portal", { x: pos.x + ORB_RADIUS, y: pos.y + ORB_RADIUS, post });
+      push({ id: crypto.randomUUID(), role: "assistant", text: `🌀 Entering world…`, ts: Date.now(), postId: (post?.id as any) });
+      return;
+    }
+
+    // search (local/web) — optional stubs
+    if (lower.startsWith("/search ")) {
+      const q = T.slice(8).trim();
+      bus.emit("assistant:search", { q, postId: post?.id });
+      push({ id: crypto.randomUUID(), role: "assistant", text: `🔎 Searching: ${q}`, ts: Date.now() });
+      return;
+    }
+
+    // default: forward to backend assistant
+    bus.emit("assistant:ask", { text: T, postId: post?.id });
+    push({ id: crypto.randomUUID(), role: "assistant", text: `🤖 Working on it…`, ts: Date.now(), postId: (post?.id as any) });
   }
 
-  // Emoji grid for reactions/remixes:
-  const EMOJI_LIST = [
-    "😂","🥵","😅","🤔","🙂","😉","😍","😎","😢","😭","🤣","🥳","🤯","😡","😱","🤗","🤭","🙄","🥺","🤪","🤫","🤤",
+  /** Emoji list (100+, starts with 🤗 as requested) */
+  const EMOJI_LIST = useMemo(() => [
+    "🤗","😂","🥵","😅","🤔","🙂","😉","😍","😎","😢","😭","🤣","🥳","🤯","😡","😱","🤭","🙄","🥺","🤪","🤫","🤤",
     "😴","👻","🤖","💀","👽","😈","👋","👍","👎","👏","🙏","👀","💪","🫶","💅","🔥","✨","⚡","💥","❤️","🧡","💛",
     "💚","💙","💜","🖤","🤍","💔","❤️‍🔥","❤️‍🩹","💯","💢","💬","🗯️","🎉","🎊","🎁","🏆","⚽","🎮","🚀","✈️",
-    "🚗","🏠","📱","💡","🎵","🎶","📢","📚","📅","📈","✅","❌","❗","❓","‼️","⚠️","🔞","🌀","🎬","🦄","🍕",
-    "🍔","🍎","🍺","🌈","✏️","🖊️","⚙️","🧩","🫠","🫡","🫨","🤡","🤝","🫰","🤌","🫵","🫂","🧠","🗿"
-  ];
+    "🚗","🏠","📱","💡","🎵","🎶","📢","📚","📅","📈","✅","❌","❗","❓","‼️","⚠️","🌀","🎬","🦄","🍕","🍔",
+    "🍎","🍺","🌈","✏️","🖊️","⚙️","🧩","🫠","🫡","🫨","🤡","🤝","🫰","🤌","🫵","🫂","🧠","🗿","🛰️","🧪","🧨",
+  ], []);
+
   function handleEmojiClick(emoji: string) {
-    if (emoji === "🌀") {
-      handleCommand("/world");
-    } else if (emoji === "🎬") {
-      handleCommand("/remix");
-    } else {
-      handleCommand(`/react ${emoji}`);
-    }
+    if (emoji === "🌀") { handleCommand("/world"); return; }
+    if (emoji === "🎬") { handleCommand("/remix"); return; }
+    // default reaction
+    handleCommand(`/react ${emoji}`);
   }
 
-  // Inline style to position orb at its current pos
+  /** Cleanup timers */
+  useEffect(() => {
+    return () => {
+      if (moveRafRef.current !== null) cancelAnimationFrame(moveRafRef.current);
+      if (holdTimerRef.current !== null) clearTimeout(holdTimerRef.current);
+    };
+  }, []);
+
   const orbStyle: React.CSSProperties = { left: pos.x, top: pos.y };
 
   return (
     <>
-      {/* Floating assistant orb (draggable, hot-pink theme) */}
       <button
         className={`assistant-orb ${mic ? "mic" : ""}`}
         style={orbStyle}
@@ -315,14 +267,13 @@ export default function AssistantOrb() {
         onPointerCancel={onUp}
         onClick={onClick}
         aria-label="Assistant orb"
-        title={mic ? "Listening… (click to toggle)" : "Assistant — click to open chat, hold to talk"}
+        title={mic ? "Listening… (click to toggle)" : "Assistant — click to open, hold to talk"}
       >
         <span className="assistant-orb__core" />
         <span className="assistant-orb__ring" />
         {!!toast && <span className="assistant-orb__toast">{toast}</span>}
       </button>
 
-      {/* Smart drawer panel (emoji reactions/remixes and chat) */}
       {open && (
         <div className="assistant-petal">
           <div className="ap-head">
@@ -336,49 +287,55 @@ export default function AssistantOrb() {
             <button className="ap-btn" onClick={() => setOpen(false)} aria-label="Close">✕</button>
           </div>
 
-          {/* Emoji reaction/remix grid */}
+          {/* Emoji grid */}
           <div className="ap-emojis">
-            {EMOJI_LIST.map(emoji => (
-              <button 
-                key={emoji} 
-                className="emoji-btn" 
-                onClick={() => handleEmojiClick(emoji)}
-              >
+            {EMOJI_LIST.map((emoji) => (
+              <button key={emoji} className="emoji-btn" onClick={() => handleEmojiClick(emoji)}>
                 {emoji}
               </button>
             ))}
           </div>
 
+          {/* Conversation */}
           <div className="ap-body">
             {msgs.length === 0 && (
               <div className="ap-hint">
                 Try: <code>/search</code> <code>/comment</code> <code>/react ❤️</code> <code>/world</code> <code>/remix</code>
               </div>
             )}
-            {msgs.map(m => (
+            {msgs.map((m) => (
               <div key={m.id} className={`ap-msg ${m.role}`}>
                 <div className="ap-msg-bubble">{m.text}</div>
               </div>
             ))}
             {interim && (
-              <div className="ap-msg assistant">
-                <div className="ap-msg-bubble">…{interim}</div>
-              </div>
+              <div className="ap-msg assistant"><div className="ap-msg-bubble">…{interim}</div></div>
             )}
           </div>
 
-          <form className="ap-form" onSubmit={async e => { e.preventDefault(); if (!input.trim()) return; const t = input.trim(); setInput(""); await handleCommand(t); }}>
-            <input 
-              className="ap-input" 
-              placeholder="Type /search /comment /react ❤️ /world /remix" 
-              value={input} 
-              onChange={e => setInput(e.target.value)} 
+          {/* Input */}
+          <form
+            className="ap-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!input.trim()) return;
+              const t = input.trim();
+              setInput("");
+              handleCommand(t);
+            }}
+          >
+            <input
+              className="ap-input"
+              placeholder="Type /search /comment /react ❤️ /world /remix"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
             />
-            <button 
-              className={`ap-mic ${mic ? "on" : ""}`} 
-              type="button" 
-              onClick={() => (mic ? stopListening() : startListening())} 
+            <button
+              className={`ap-mic ${mic ? "on" : ""}`}
+              type="button"
+              onClick={() => (mic ? stopListening() : startListening())}
               aria-label="Mic"
+              title={mic ? "Stop listening" : "Start listening"}
             >
               {mic ? "🎙️" : "🎤"}
             </button>
