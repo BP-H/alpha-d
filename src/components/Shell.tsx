@@ -12,6 +12,7 @@ import PostComposer from "./PostComposer";
 export default function Shell() {
   return (
     <>
+      {/* 3D world behind everything */}
       <div className="world-layer" aria-hidden>
         <World3D />
       </div>
@@ -20,16 +21,17 @@ export default function Shell() {
       <Sidebar />
       <PortalOverlay />
 
-      {/* Use the same scroll container classes the feed CSS targets */}
-      <main className="content-viewport feed-wrap">
-        {/* Composer sits in the same centered grid width as posts */}
-        <div className="feed-content">
-          <div className="post-composer">
-            <PostComposer />
-          </div>
+      {/* IMPORTANT: use the same classes the feed CSS targets */}
+      <main
+        className="content-viewport feed-wrap"
+        // topbar pushes the scroller down (Topbar sets --topbar-h)
+        style={{ paddingTop: "var(--topbar-h, 56px)" }}
+      >
+        {/* keep the composer inside the feed grid width */}
+        <div className="feed-content" style={{ padding: "12px 0" }}>
+          <PostComposer />
         </div>
 
-        {/* The actual infinite feed */}
         <Feed />
       </main>
 
