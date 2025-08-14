@@ -135,8 +135,7 @@ function People({ people }: { people: Person[] }) {
       const angle = (i / Math.max(1, people.length)) * Math.PI * 2;
       const radius = 120 + (i % 5) * 24;
       sprite.position.set(Math.cos(angle) * radius, 16 + (i % 3) * 4, Math.sin(angle) * radius);
-      // @ts-expect-error - custom data for bobbing
-      sprite.userData.baseY = sprite.position.y;
+      (sprite as any).userData.baseY = sprite.position.y;
       g.add(sprite);
 
       // Link back to portal
@@ -156,12 +155,11 @@ function People({ people }: { people: Person[] }) {
     });
   }, [people]);
 
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime() * 1.2;
-    group.current.children.forEach((obj, idx) => {
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime() * 1.2;
+    group.current.children.forEach((obj: THREE.Object3D, idx: number) => {
       if ((obj as THREE.Sprite).isSprite) {
-        // @ts-expect-error custom data
-        const baseY = obj.userData.baseY || 16;
+        const baseY = (obj as any).userData.baseY || 16;
         obj.position.y = baseY + Math.sin(t + idx) * 1.5;
       }
     });
