@@ -1,3 +1,4 @@
+// src/components/feed/Feed.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import PostCard from "./PostCard";
 import { demoPosts } from "../../lib/placeholders";
@@ -8,7 +9,7 @@ const PAGE = 9;
 const PRELOAD_PX = 800;
 
 export default function Feed(){
-  const posts: Post[] = demoPosts; // hook your store later
+  const posts: Post[] = demoPosts;
   const [limit, setLimit] = useState(PAGE);
   const visible = useMemo(() => posts.slice(0, limit), [posts, limit]);
   const ref = useRef<HTMLDivElement|null>(null);
@@ -25,7 +26,7 @@ export default function Feed(){
     return () => el.removeEventListener("scroll", onScroll);
   }, [limit, posts.length]);
 
-  // feed:hover (nearest post under viewport center)
+  // feed:hover (nearest post around viewport mid)
   useEffect(() => {
     const el = ref.current!; if (!el) return;
     let raf = 0;
@@ -41,8 +42,8 @@ export default function Feed(){
       }
       if (best) {
         const id = best.node.dataset.postId!;
-        const idx = posts.findIndex(p => String(p.id) === id);
-        if (idx >= 0) bus.emit("feed:hover", { post: posts[idx], rect: best.node.getBoundingClientRect() });
+        const p = posts.find(pp => String(pp.id) === id);
+        if (p) bus.emit("feed:hover", { post: p, rect: best.node.getBoundingClientRect() });
       }
       raf = requestAnimationFrame(tick);
     };
@@ -51,9 +52,11 @@ export default function Feed(){
   }, [posts]);
 
   return (
-    <div ref={ref} className="content-viewport" style={{ height: "100%", overflow: "auto", paddingBottom: 80 }}>
-      <div style={{ display:"grid", gap:12 }}>
-        {visible.map((p, i) => <PostCard key={`${p.id}-${i}`} post={p} />)}
+    <div ref={ref} className="content-viewport">
+      <div className="feed-wrap">
+        <div className="feed-content">
+          {visible.map((p, i) => <PostCard key={`${p.id}-${i}`} post={p} />)}
+        </div>
       </div>
     </div>
   );
