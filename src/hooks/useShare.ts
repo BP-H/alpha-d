@@ -1,4 +1,7 @@
 import bus from "../lib/bus";
+import { importPosts as importFrom } from "../lib/import";
+import { repost } from "../lib/repost";
+import type { Platform } from "../lib/repost";
 
 /**
  * Share a post link using the Web Share API when available.
@@ -29,5 +32,32 @@ export async function sharePost(url: string, title?: string) {
  */
 export function repostPost(id: string) {
   bus.emit("feed:repost", id);
+  bus.emit("toast", "Repost successful");
+}
+
+/**
+ * Import content from a connected platform and surface status via toast.
+ */
+export async function importContent(platform: Platform) {
+  try {
+    await importFrom(platform);
+    bus.emit("toast", `Imported from ${platform}`);
+  } catch (err) {
+    bus.emit("toast", "Import failed");
+    console.error(err);
+  }
+}
+
+/**
+ * Repost content to a platform and surface status via toast.
+ */
+export async function repostContent(platform: Platform, content: string) {
+  try {
+    await repost(platform, content);
+    bus.emit("toast", `Reposted to ${platform}`);
+  } catch (err) {
+    bus.emit("toast", "Repost failed");
+    console.error(err);
+  }
 }
 
