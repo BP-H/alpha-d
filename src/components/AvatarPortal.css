@@ -1,0 +1,28 @@
+/* src/components/AvatarPortal.css */
+.avatar-portal{
+  position: fixed; inset: 0; z-index: 80; pointer-events: none;
+  overflow: hidden;
+}
+.ap-splash{
+  position:absolute; top:8px; left:8px; width:36px; height:36px; border-radius:999px;
+  background: radial-gradient(120% 120% at 30% 30%, #fff, #ffc6f3 60%, var(--pink));
+  filter: blur(0px);
+  animation: apSplash .9s cubic-bezier(.2,.9,.1,1) forwards;
+  transform-origin: top left;
+}
+.ap-ring{
+  position:absolute; top:6px; left:6px; width:40px; height:40px; border-radius:999px;
+  border: 2px solid rgba(255,255,255,.6);
+  animation: apRing .9s ease-out forwards;
+  transform-origin: top left;
+}
+@keyframes apSplash{
+  0% { transform: scale(1); opacity:1; }
+  80% { transform: scale(30); opacity:.2; filter: blur(30px); }
+  100% { transform: scale(40); opacity:0; filter: blur(50px); }
+}
+@keyframes apRing{
+  0% { transform: scale(1); opacity:1; }
+  60% { transform: scale(26); opacity:.9; }
+  100% { transform: scale(40); opacity:0; }
+}
