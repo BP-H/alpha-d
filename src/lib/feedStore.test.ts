@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { useFeedStore, usePaginatedPosts } from "./feedStore";
 
 const samplePosts = [
@@ -21,5 +21,11 @@ describe("usePaginatedPosts", () => {
   it("returns first page when pageSize <= 0", () => {
     const { result } = renderHook(() => usePaginatedPosts(1, 0));
     expect(result.current.map((p) => p.id)).toEqual([1]);
+  });
+
+  it("prepends posts via addPost", () => {
+    const { result } = renderHook(() => useFeedStore());
+    act(() => result.current.addPost({ id: 4, title: "four" } as any));
+    expect(result.current.posts[0].id).toBe(4);
   });
 });
