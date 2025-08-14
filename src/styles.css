@@ -176,3 +176,5 @@ button,input,textarea,select{font:inherit;color:inherit}
 .portal-overlay.on{ --r0: 160vmax; opacity:1; }
 
 /* Topbar offset for the scroller */
+.feed-viewport{ padding-top: var(--topbar-h, 56px); }
+
