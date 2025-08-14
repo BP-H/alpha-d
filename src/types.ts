@@ -1,3 +1,11 @@
+// src/types.ts
+export type User = {
+  id: string;
+  name?: string;
+  handle?: string;
+  avatar?: string;
+};
+
 export type Post = {
   id: string | number;
   author?: string;
@@ -29,7 +37,7 @@ export type SearchResult = {
 
 export type RemixSpec = {
   kind: "image-to-video" | "style-transfer" | "music-reactive" | "prompt-video";
-  src?: string; // image or media url
+  src?: string;
   params?: Record<string, unknown>;
 };
 
