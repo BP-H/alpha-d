@@ -20,8 +20,16 @@ export default function Shell() {
       <Sidebar />
       <PortalOverlay />
 
-      <main className="feed-viewport">
-        <PostComposer />
+      {/* Use the same scroll container classes the feed CSS targets */}
+      <main className="content-viewport feed-wrap">
+        {/* Composer sits in the same centered grid width as posts */}
+        <div className="feed-content">
+          <div className="post-composer">
+            <PostComposer />
+          </div>
+        </div>
+
+        {/* The actual infinite feed */}
         <Feed />
       </main>
 
