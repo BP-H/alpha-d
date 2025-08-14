@@ -1,21 +1,29 @@
 // src/types.ts
+
+// Shared ID alias
+export type ID = string | number;
+
 export type User = {
-  id: string;
+  id: ID;
   name?: string;
   handle?: string;
   avatar?: string;
 };
 
 export type Post = {
-  id: string | number;
+  id: ID;
   author?: string;
   authorAvatar?: string;
   title?: string;
   time?: string;
   location?: string;
-  image?: string;
-  images?: string[];
-  cover?: string;
+
+  /** Media (new + legacy) */
+  image?: string;       // legacy single image
+  images?: string[];    // preferred: multiple images
+  cover?: string;       // legacy alias
+  video?: string;       // optional video URL (blob:/remote)
+  link?: string;        // optional external link being shared
 };
 
 export type AssistantMessage = {
@@ -23,7 +31,7 @@ export type AssistantMessage = {
   role: "system" | "user" | "assistant" | "tool";
   text: string;
   ts: number;
-  postId?: string | number | null;
+  postId?: ID | null;
   meta?: Record<string, unknown>;
 };
 
