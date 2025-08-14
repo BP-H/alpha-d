@@ -1,3 +1,8 @@
 /* src/feed.css */
-.feed-wrap{padding:12px 0 120px}
+.feed-wrap{
+  width:100vw;
+  padding:12px 2px 120px;
+  box-sizing:border-box;
+  overflow-x:hidden;
+}
 .feed-content{width:100%;margin:0 auto;display:grid;gap:12px}
