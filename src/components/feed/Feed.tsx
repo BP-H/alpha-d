@@ -20,7 +20,7 @@ export default function Feed() {
 
   // infinite scroll
   useEffect(() => {
-    const el = ref.current!;
+    const el = ref.current;
     if (!el) return;
     const onScroll = () => {
       const near = el.scrollTop + el.clientHeight > el.scrollHeight - PRELOAD_PX;
@@ -34,7 +34,7 @@ export default function Feed() {
   // feed:hover (nearest post around viewport mid) — only if we have posts
   useEffect(() => {
     if (!posts.length) return;
-    const el = ref.current!;
+    const el = ref.current;
     if (!el) return;
     let raf = 0;
     const tick = () => {
