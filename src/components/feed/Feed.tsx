@@ -1,21 +1,17 @@
 // src/components/feed/Feed.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import PostCard from "./PostCard";
-import { demoPosts } from "../../lib/placeholders";
 import bus from "../../lib/bus";
 import type { Post } from "../../types";
+import { useFeedStore } from "../../lib/feedStore";
 import "./Feed.css";
 
 const PAGE = 9;
 const PRELOAD_PX = 800;
 
 export default function Feed() {
-  // Allow real posts to be injected at runtime: window.__SN_POSTS__ = Post[]
-  const injected = (window as any).__SN_POSTS__ as Post[] | undefined;
-  const source = Array.isArray(injected) && injected.length ? injected : demoPosts;
-
+  const posts = useFeedStore((s) => s.posts);
   const [limit, setLimit] = useState(PAGE);
-  const posts: Post[] = source;
   const visible = useMemo(() => posts.slice(0, limit), [posts, limit]);
   const ref = useRef<HTMLDivElement | null>(null);
 

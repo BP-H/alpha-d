@@ -7,6 +7,7 @@ import ChatDock from "./ChatDock";
 import Topbar from "./Topbar";
 import Sidebar from "./Sidebar";
 import PortalOverlay from "./PortalOverlay";
+import PostComposer from "./PostComposer";
 
 export default function Shell() {
   return (
@@ -20,6 +21,7 @@ export default function Shell() {
       <PortalOverlay />
 
       <main className="feed-viewport">
+        <PostComposer />
         <Feed />
       </main>
 
