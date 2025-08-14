@@ -1,6 +1,8 @@
 // src/lib/api.ts
 export async function assistantReply(prompt: string): Promise<{ ok: boolean; text?: string; error?: string }> {
-  const apiKey = localStorage.getItem("sn2177.apiKey") || "";
+  const apiKey = typeof window !== "undefined"
+    ? localStorage.getItem("sn2177.apiKey") || ""
+    : "";
   try {
     const r = await fetch("/api/assistant-reply", {
       method: "POST",
