@@ -18,4 +18,9 @@ You can deploy your new Vite project with a single command from your terminal us
 
 ```shell
 $ vercel
-``` 
+```
+
+## Super user posting demo
+
+Generate a key via `/api/generate-superuser-key` and set it in the `VITE_SUPER_USER_KEY` env variable.
+The `PostComposer` component accepts this key and can stub reposts to X/Twitter, Facebook, LinkedIn, or Instagram.
