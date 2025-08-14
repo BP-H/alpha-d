@@ -1,6 +1,5 @@
 // src/components/PostCard.tsx
 import "./postcard.css";
-import "./postcard.media.css"; // small add-on: ensures media fills and fades in
 import type { Post, User } from "../types";
 import { sharePost } from "../lib/share";
 
@@ -12,21 +11,30 @@ type Props = {
 };
 
 export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
-  // prefer cover → image → first of images
-  const img =
-    // @ts-ignore – some data shapes may use cover/image
-    (post as any).cover ||
-    // @ts-ignore
-    (post as any).image ||
-    post.images?.[0];
-
+  const img = (post as any).images?.[0] as string | undefined;
   const video = (post as any).video as string | undefined;
   const mediaFallback = "/vite.svg";
 
-  const author = (post as any).author || "@someone";
+  const onMediaReady = (e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => {
+    const el = e.currentTarget as HTMLImageElement | HTMLVideoElement;
+    // reveal (our CSS starts at opacity:0)
+    try {
+      el.style.opacity = "1";
+    } catch {}
+    // revoke blob URL *after* media has loaded
+    const src =
+      (el as HTMLImageElement).currentSrc ||
+      (el as HTMLImageElement).src ||
+      (el as HTMLVideoElement).currentSrc ||
+      (el as HTMLVideoElement).src ||
+      "";
+    if (src && src.startsWith("blob:")) {
+      try { URL.revokeObjectURL(src); } catch {}
+    }
+  };
 
   return (
-    <article className="pc" data-post-id={`${(post as any).id ?? ""}`}>
+    <article className="pc" data-post-id={(post as any).id}>
       {/* media */}
       <div className="pc-media">
         {video ? (
@@ -35,14 +43,14 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
             controls
             playsInline
             preload="metadata"
-            onLoadedData={(e) => (e.currentTarget.style.opacity = "1")}
+            onLoadedData={onMediaReady}
           />
         ) : (
           <img
             src={img || mediaFallback}
             alt=""
             loading="lazy"
-            onLoad={(e) => (e.currentTarget.style.opacity = "1")}
+            onLoad={onMediaReady}
           />
         )}
 
@@ -50,11 +58,11 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
         <div className="pc-topbar">
           <div
             className="pc-ava"
-            onClick={() => onOpenProfile?.(author)}
+            onClick={() => onOpenProfile?.((post as any).author || "")}
             role="button"
           />
           <div className="pc-meta">
-            <div className="pc-handle">{author}</div>
+            <div className="pc-handle">{(post as any).author || "@someone"}</div>
             <div className="pc-sub">{(post as any).time || "now"}</div>
           </div>
           <div className="pc-title">{(post as any).title || "Untitled"}</div>
@@ -63,38 +71,19 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
         {/* frosted bottom bar */}
         <div className="pc-botbar">
           <div className="pc-actions">
-            <button
-              className="pc-act profile"
-              onClick={() => onOpenProfile?.(author)}
-            >
+            <button className="pc-act profile" onClick={() => onOpenProfile?.((post as any).author || "")}>
               <span className="ico" />
-              {author || "Profile"}
+              {(post as any).author || "Profile"}
             </button>
-
             <button className="pc-act">
               <span className="ico heart" /> Like
             </button>
-
             <button className="pc-act">
               <span className="ico comment" /> Comment
             </button>
-
-            <button
-              className="pc-act"
-              onClick={() => {
-                const url =
-                  // if the post has an explicit link, prefer it
-                  (post as any).link ||
-                  // otherwise share whatever media URL we have
-                  (typeof img === "string" ? img : window.location.href);
-                // matches lib/share.ts (ShareOptions)
-                // @ts-ignore allow both current and older signatures
-                sharePost({ url, title: (post as any).title || "" });
-              }}
-            >
+            <button className="pc-act" onClick={() => sharePost({ url: post.link || window.location.href, title: post.title })}>
               <span className="ico share" /> Share
             </button>
-
             <button className="pc-act" onClick={() => onEnterWorld?.()}>
               <span className="ico world" /> Enter
             </button>
@@ -103,7 +92,7 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
       </div>
 
       {/* optional slide drawer */}
-      <div className="pc-drawer">{/* future: comments / emoji, etc. */}</div>
+      <div className="pc-drawer">{/* comments or emoji drawer later */}</div>
     </article>
   );
 }
