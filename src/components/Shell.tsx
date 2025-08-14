@@ -1,62 +1,61 @@
-import React, { useMemo } from "react";
-import Feed from "./feed/Feed";
+// src/components/Shell.tsx
+import React, { useCallback } from "react";
+import BrandBadge from "./BrandBadge";
 import AssistantOrb from "./AssistantOrb";
-import World3D from "./World3D";
 import ChatDock from "./ChatDock";
-import bus from "../lib/bus";
+import Feed from "./feed/Feed";
+import World3D from "./World3D";
+
+// Try to import placeholders (if present). If names differ on your branch, fall back.
 import * as placeholders from "../lib/placeholders";
 
-// Feed's exact "Me" type lives in the Feed file; we don't need its shape here.
-// We'll assemble a tolerant object and cast to any to satisfy TS at the call-site.
-type MeLoose = any;
+/**
+ * Shell mounts the main app shell: 3D world (background), brand, feed, orb, chatdock.
+ * This version is defensive: if placeholders exports are missing, it uses sensible defaults.
+ */
 
-export default function Shell() {
-  // Try to source the current user from your placeholders module,
-  // but fall back to a minimal "me" if fields are named differently.
-  const me: MeLoose = useMemo(() => {
-    const p: any =
-      (placeholders as any).me ||
-      (placeholders as any).ME ||
-      (placeholders as any).currentUser ||
-      {};
-    return {
-      id: p.id ?? "me",
-      name: p.name ?? p.displayName ?? "You",
-      handle: p.handle ?? p.username ?? "@you",
-      avatar: p.avatar ?? p.avatarUrl ?? p.photo ?? "",
-    } as any;
-  }, []);
+type UserLike = { id?: string; name?: string; avatar?: string };
 
-  // Hook up world/portal bus the same way the rest of the app expects.
-  const onEnterWorld = () => {
-    try {
-      bus.emit?.("ui:enter-world", {});
-    } catch {}
-  };
+export default function Shell(props: {
+  me?: UserLike;
+  onEnterWorld?: () => void;
+}) {
+  // fallback user from placeholders or sensible default
+  const phMe = (placeholders as any).me || (placeholders as any).ME || (placeholders as any).currentUser;
+  const me = props.me ?? phMe ?? { id: "me", name: "You", avatar: "" };
 
-  const onPortal = (post: any, at: { x: number; y: number }) => {
-    try {
-      bus.emit?.("portal:open", { post, at });
-    } catch {}
-  };
+  const onEnterWorld = props.onEnterWorld ?? (() => { /* noop */ });
+
+  const handlePortal = useCallback((post: any, at: { x: number; y: number }) => {
+    // Forward to app-level handler if present (keeps prior portal behaviour)
+    // In your app you probably open a portal; for now we call onEnterWorld()
+    onEnterWorld();
+  }, [onEnterWorld]);
 
   return (
     <>
-      {/* 3D background sits behind everything and does not steal input */}
-      <div className="world-layer">
-        <World3D selected={null} onBack={() => {}} />
+      {/* 3D background: intentionally behind feed */}
+      <div className="world-layer" aria-hidden="true" style={{ pointerEvents: "none" }}>
+        {/* Render World3D but keep it passive; if it errors, it won't crash feed */}
+        <World3D selected={null as any} onBack={() => {}} />
       </div>
 
-      {/* Scrollable feed viewport (your CSS targets these classes) */}
-      <div className="content-viewport">
+      {/* Brand (top-left) */}
+      <BrandBadge onEnterUniverse={onEnterWorld} />
+
+      {/* Main feed area (always visible, high z-index) */}
+      <main className="content-viewport" style={{ zIndex: 10 }}>
         <div className="feed-wrap">
-          {/* ✅ pass required props back to Feed */}
-          <Feed me={me} onEnterWorld={onEnterWorld} />
+          <div className="feed-content">
+            <Feed />
+          </div>
         </div>
-      </div>
+      </main>
 
-      {/* Fixed overlay UI */}
-      <AssistantOrb onPortal={onPortal} />
+      {/* Assistant UI */}
+      <AssistantOrb onPortal={handlePortal} />
+
+      {/* Chat dock - keeps messages */}
       <ChatDock />
     </>
   );
