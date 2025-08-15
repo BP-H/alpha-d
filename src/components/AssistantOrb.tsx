@@ -1,418 +1,401 @@
-// src/components/AssistantOrb.tsx
 import React, { useEffect, useRef, useState } from "react";
 import bus from "../lib/bus";
 import type { AssistantMessage, Post } from "../types";
 
-/**
- * AssistantOrb.tsx
- * Full replacement — fixes drag/hover glitches and improves speech handling.
- *
- * Usage: paste over your existing file. No extra CSS files required (inline styles).
- */
-
-/* Small helpful types for SpeechRecognition (loose) */
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onstart?: () => void;
-  onend?: () => void;
-  onerror?: (e?: any) => void;
-  onresult?: (e?: any) => void;
-  start?: () => void;
-  stop?: () => void;
-};
+declare global {
+  interface Window { webkitSpeechRecognition?: any; SpeechRecognition?: any; }
+}
 
 const ORB_SIZE = 76;
-const ORB_MARGIN = 12;
 const ORB_RADIUS = ORB_SIZE / 2;
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 
+/** Minimal stubs so we don't add new deps — wire these to your backend later */
+async function askLLMStub(text: string, _ctx?: any): Promise<AssistantMessage> {
+  return { id: crypto.randomUUID(), role: "assistant", text: `🤖 (stub) ${text}`, ts: Date.now() };
+}
+async function imageToVideoStub(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  return { ok: false, error: "Remix backend not connected" };
+}
+
 export default function AssistantOrb() {
-  // ---------- position state (top-left coords) ----------
+  // position state for draggable orb
   const [pos, setPos] = useState(() => {
-    if (typeof window === "undefined") return { x: 0, y: 0 };
-    return {
-      x: Math.max(ORB_MARGIN, window.innerWidth - ORB_SIZE - ORB_MARGIN),
-      y: Math.max(ORB_MARGIN, window.innerHeight - ORB_SIZE - ORB_MARGIN),
-    };
+    const w = typeof window !== "undefined" ? window.innerWidth : ORB_SIZE;
+    const h = typeof window !== "undefined" ? window.innerHeight : ORB_SIZE;
+    return { x: w - ORB_SIZE, y: h - ORB_SIZE };
   });
 
-  // keep pos within bounds on resize
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const onResize = () => {
-      setPos((p) => ({
-        x: clamp(p.x, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerWidth - ORB_SIZE - ORB_MARGIN)),
-        y: clamp(p.y, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - ORB_SIZE - ORB_MARGIN)),
+      setPos(p => ({
+        x: clamp(p.x, 0, window.innerWidth - ORB_SIZE),
+        y: clamp(p.y, 0, window.innerHeight - ORB_SIZE),
       }));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // ---------- refs for dragging logic ----------
-  const pressRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const pressRef = useRef<{ id: number; x: number; y: number } | null>(null);
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
-  const moveRafRef = useRef<number | null>(null);
-  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const hoverIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
+  const moveRafRef = useRef<number | null>(null);
+  const lastMoveRef = useRef<{ x: number; y: number } | null>(null);
+  const hoverIdRef = useRef<string | null>(null);
 
-  // ---------- chat + mic state ----------
+  // chat state
   const [open, setOpen] = useState(false);
   const [mic, setMic] = useState(false);
-  const [interim, setInterim] = useState("");
-  const [toast, setToast] = useState("");
+  const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<AssistantMessage[]>([]);
-  const [ctxPost, setCtxPost] = useState<Post | null>(null);
+  const [toast, setToast] = useState("");
+  const [interim, setInterim] = useState("");
 
-  // subscribe to context (feed hover/select)
+  // context post (for linking reactions/comments to a specific post)
+  const [ctxPost, setCtxPost] = useState<Post | null>(null);
   useEffect(() => {
-    const unsub1 = bus.on?.("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
-    const unsub2 = bus.on?.("feed:select", (p: { post: Post }) => setCtxPost(p.post));
+    const off1 = bus.on?.("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
+    const off2 = bus.on?.("feed:select", (p: { post: Post }) => setCtxPost(p.post));
+    return () => { off1?.(); off2?.(); };
+  }, []);
+
+  useEffect(() => {
     return () => {
-      try { unsub1?.(); } catch {}
-      try { unsub2?.(); } catch {}
+      if (moveRafRef.current !== null) cancelAnimationFrame(moveRafRef.current);
+      if (holdTimerRef.current !== null) clearTimeout(holdTimerRef.current);
     };
   }, []);
 
-  // ---------- speech recognition refs ----------
-  const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const restartRef = useRef(false);
-
-  function ensureRec(): SpeechRecognitionLike | null {
-    if (recRef.current) return recRef.current;
-    const C = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!C) {
-      setToast("Voice not supported");
-      return null;
-    }
-    const rec: SpeechRecognitionLike = new (C as any)();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-
-    rec.onstart = () => {
-      setMic(true);
-      setToast("Listening…");
-    };
-    rec.onend = () => {
-      setMic(false);
-      setToast("");
-      if (restartRef.current) {
-        try { rec.start && rec.start(); } catch {}
-      }
-    };
-    rec.onerror = () => {
-      setMic(false);
-      setToast("Mic error");
-    };
-    rec.onresult = (e: any) => {
-      // build interim & final transcripts
-      let interimT = "";
-      const finals: string[] = [];
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        const t = r[0]?.transcript || "";
-        if (r.isFinal) finals.push(t);
-        else interimT += t;
-      }
-      setInterim(interimT.trim());
-      const final = finals.join(" ").trim();
-      if (final) {
-        setInterim("");
-        handleCommand(final);
-      }
-    };
-
-    recRef.current = rec;
-    return rec;
-  }
-
-  function startListening() {
-    if (mic) return;
-    const r = ensureRec();
-    if (!r) return;
-    restartRef.current = true;
-    try { r.start && r.start(); } catch (e) { setToast("Mic error"); setMic(false); }
-  }
-  function stopListening() {
-    restartRef.current = false;
-    try { recRef.current?.stop && recRef.current.stop(); } catch {}
-    setMic(false);
-    setInterim("");
-  }
-
-  // ---------- command handler (simplified) ----------
-  async function handleCommand(text: string) {
-    const post = ctxPost || null;
-    const push = (m: AssistantMessage) => setMsgs((s) => [...s, m]);
-
-    push({ id: crypto.randomUUID(), role: "user", text, ts: Date.now(), postId: (post?.id as any) });
-
-    const T = text.trim();
-    const lower = T.toLowerCase();
-
-    if (lower.startsWith("/react")) {
-      const emoji = T.replace("/react", "").trim() || "❤️";
-      if (post) {
-        bus.emit("post:react", { id: post.id, emoji });
-        push({ id: crypto.randomUUID(), role: "assistant", text: `✨ Reacted ${emoji} on ${post.id}`, ts: Date.now(), postId: (post.id as any) });
-      } else {
-        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected. Drag the orb over a post.`, ts: Date.now() });
-      }
-      return;
-    }
-
-    // fallback reply stub
-    push({ id: crypto.randomUUID(), role: "assistant", text: `🤖 I heard: "${T}" (stub)`, ts: Date.now() });
-  }
-
-  // ---------- helpers for hover highlight ----------
-  function setHoverTargetId(id: string | null) {
-    // clear previous
-    if (hoverIdRef.current) {
-      document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)?.classList.remove("pc-target");
-      hoverIdRef.current = null;
-    }
-    if (id) {
-      const target = document.querySelector(`[data-post-id="${id}"]`) as HTMLElement | null;
-      if (target) {
-        target.classList.add("pc-target");
-        hoverIdRef.current = id;
-      }
-    }
-  }
-
-  // ---------- core pointer handlers ----------
-  function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    // capture pointer
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
-    const offsetX = e.clientX - pos.x;
-    const offsetY = e.clientY - pos.y;
-    pressRef.current = { pointerId: e.pointerId, offsetX, offsetY };
+  // Drag + hold-to-talk
+  function onDown(e: React.PointerEvent<HTMLButtonElement>) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    pressRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
     movedRef.current = false;
-    suppressClickRef.current = false;
-    // hold-to-talk
-    if (holdTimerRef.current !== null) { window.clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
     holdTimerRef.current = window.setTimeout(() => {
-      // if held long enough, start listening and mark so a click is suppressed
       suppressClickRef.current = true;
       startListening();
     }, 280);
   }
-
-  function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+  function onMove(e: React.PointerEvent<HTMLButtonElement>) {
     if (!pressRef.current) return;
-    lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    lastMoveRef.current = { x: e.clientX, y: e.clientY };
     if (moveRafRef.current !== null) return;
     moveRafRef.current = requestAnimationFrame(() => {
       moveRafRef.current = null;
-      const cur = lastPointerRef.current;
-      const pr = pressRef.current;
-      if (!cur || !pr) return;
-      const nx = clamp(cur.x - pr.offsetX, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerWidth - ORB_SIZE - ORB_MARGIN));
-      const ny = clamp(cur.y - pr.offsetY, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - ORB_SIZE - ORB_MARGIN));
-      const dx = Math.abs(nx - pos.x);
-      const dy = Math.abs(ny - pos.y);
-      if (!movedRef.current && Math.hypot(dx, dy) < 4) return;
+      if (!pressRef.current || !lastMoveRef.current) return;
+      const { x: cx, y: cy } = lastMoveRef.current;
+      const dx = cx - pressRef.current.x;
+      const dy = cy - pressRef.current.y;
+      if (!movedRef.current && Math.hypot(dx, dy) < 5) return;
       movedRef.current = true;
-      // cancel hold-to-talk if we start dragging
       if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+      const nx = clamp(cx - ORB_RADIUS, 0, window.innerWidth - ORB_SIZE);
+      const ny = clamp(cy - ORB_RADIUS, 0, window.innerHeight - ORB_SIZE);
       setPos({ x: nx, y: ny });
-
       // highlight post under pointer
-      const el = document.elementFromPoint(cur.x, cur.y) as HTMLElement | null;
+      const el = document.elementFromPoint(cx, cy) as HTMLElement | null;
       const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
       const id = target?.dataset.postId || null;
       if (id !== hoverIdRef.current) {
-        setHoverTargetId(id);
-        if (id) bus.emit?.("feed:select-id", { id });
+        if (hoverIdRef.current) {
+          document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)
+            ?.classList.remove("pc-target");
+        }
+        hoverIdRef.current = id;
+        if (id && target) {
+          target.classList.add("pc-target");
+          bus.emit?.("feed:select-id", { id });
+        }
       }
     });
   }
-
-  function handlePointerEnd(e: React.PointerEvent<HTMLButtonElement>) {
-    // common cleanup for up/cancel/lostcapture
+  function onUp(e: React.PointerEvent<HTMLButtonElement>) {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
     if (moveRafRef.current !== null) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
-    lastPointerRef.current = null;
-
+    lastMoveRef.current = null;
     const dragged = movedRef.current;
-    movedRef.current = false;
     pressRef.current = null;
-
-    // if microphoned and a suppressed click (i.e. we started listening via hold) -> stop listening and link to post if dragged
+    movedRef.current = false;
+    const hovered = hoverIdRef.current;
+    if (hovered) {
+      document.querySelector(`[data-post-id="${hovered}"]`)?.classList.remove("pc-target");
+      hoverIdRef.current = null;
+    }
     if (mic && suppressClickRef.current) {
       stopListening();
-      // attempt to link to a post under pointer
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
       if (dragged && target) {
         const id = target.dataset.postId!;
-        bus.emit("post:focus", { id });
+        bus.emit?.("post:focus", { id });
         setToast(`🎯 linked to ${id}`);
-        window.setTimeout(() => setToast(""), 1100);
+        setTimeout(() => setToast(""), 1100);
       }
-    } else {
-      // if not a mic-suppressed flow and we dragged, just persist pos (already set by onMove)
-      if (!dragged) {
-        // click occurred (if not suppressed)
+      setTimeout(() => (suppressClickRef.current = false), 0);
+    }
+  }
+  function onClick() {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
+    setOpen(v => !v);
+  }
+
+  // Speech recognition (optional)
+  const recRef = useRef<any | null>(null);
+  const restartRef = useRef(false);
+  function ensureRec(): any | null {
+    if (recRef.current) return recRef.current;
+    const C = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!C) { setToast("Voice not supported"); return null; }
+    const rec = new C();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+    rec.onstart = () => setToast("Listening…");
+    rec.onend = () => { setToast(""); if (restartRef.current) { try { rec.start(); } catch {} } };
+    rec.onerror = () => setToast("Mic error");
+    rec.onresult = async (e: any) => {
+      let tmp = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (!r.isFinal) tmp += r[0]?.transcript || "";
       }
+      if (tmp) setInterim(tmp.trim());
+      const finals = Array.from(e.results).filter((r: any) => r.isFinal)
+                      .map((r: any) => r?.[0]?.transcript || "");
+      const final = finals.join(" ").trim();
+      if (!final) return;
+      setInterim("");
+      handleCommand(final);
+    };
+    recRef.current = rec;
+    return rec;
+  }
+  function startListening() { const r = ensureRec(); if (!r) return; restartRef.current = true; try { r.start(); } catch {} setMic(true); }
+  function stopListening() { restartRef.current = false; try { recRef.current?.stop(); } catch {} setMic(false); setInterim(""); }
+
+  // Commands
+  async function handleCommand(text: string) {
+    const post = ctxPost || null;
+    const push = (m: AssistantMessage) => setMsgs(s => [...s, m]);
+    push({ id: crypto.randomUUID(), role: "user", text, ts: Date.now(), postId: post?.id as any });
+
+    const T = text.trim();
+    const lower = T.toLowerCase();
+
+    if (lower.startsWith("/comment ")) {
+      const body = T.slice(9).trim();
+      if (post) {
+        bus.emit?.("post:comment", { id: post.id, body });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `💬 Commented: ${body}`, ts: Date.now(), postId: post.id as any });
+      } else {
+        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected. Drag the orb over a post to link.`, ts: Date.now() });
+      }
+      return;
     }
 
-    // clear hover highlight
-    setHoverTargetId(null);
+    if (lower.startsWith("/react")) {
+      const emoji = T.replace("/react", "").trim() || "❤️";
+      if (post) {
+        bus.emit?.("post:react", { id: post.id, emoji });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `✨ Reacted ${emoji}`, ts: Date.now(), postId: post.id as any });
+      } else {
+        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected.`, ts: Date.now() });
+      }
+      return;
+    }
 
-    // reset suppressClick in next frame (safer)
-    requestAnimationFrame(() => { suppressClickRef.current = false; });
+    if (lower.startsWith("/world")) {
+      bus.emit?.("orb:portal", { post: post || { id: "void" }, x: pos.x, y: pos.y });
+      push({ id: crypto.randomUUID(), role: "assistant", text: `🌀 Entering world…`, ts: Date.now(), postId: post?.id as any });
+      return;
+    }
+
+    if (lower.startsWith("/remix")) {
+      const r = await imageToVideoStub();
+      push({ id: crypto.randomUUID(), role: "assistant", text: r.ok ? `🎬 Remix queued: ${r.url}` : `❌ Remix failed: ${r.error}`, ts: Date.now() });
+      return;
+    }
+
+    // Default: stubbed LLM
+    const ans = await askLLMStub(T, { post });
+    push(ans);
   }
 
-  function onClick(e?: React.MouseEvent) {
-    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
-    setOpen((v) => !v);
+  const EMOJI_LIST = [
+    "😂","🥵","😅","🤔","🙂","😉","😍","😎","😢","😭","🤣","🥳","🤯","😡","😱","🤗","🤭","🙄","🥺","🤪","🤫","🤤",
+    "😴","👻","🤖","💀","👽","😈","👋","👍","👎","👏","🙏","👀","💪","🫶","💅","🔥","✨","⚡","💥","❤️","🧡","💛",
+    "💚","💙","💜","🖤","🤍","💔","❤️‍🔥","❤️‍🩹","💯","💢","💬","🗯️","🎉","🎊","🎁","🏆","🚀","✅","❌","❗","❓",
+    "⚠️","🎮","🎶","📈","🧠","🗿","🍕","🍔","🌈","🦄","🌀","🎬"
+  ];
+  function handleEmojiClick(emoji: string) {
+    if (emoji === "🌀") handleCommand("/world");
+    else if (emoji === "🎬") handleCommand("/remix");
+    else handleCommand(`/react ${emoji}`);
   }
 
-  // bind pointercancel & lostcapture to same handler
-  // (handlers will be attached to the button element below)
+  const orbStyle: React.CSSProperties = { left: pos.x, top: pos.y };
 
-  // ---------- unmount cleanup ----------
-  useEffect(() => {
-    return () => {
-      // stop recognition & prevent restarts
-      restartRef.current = false;
-      try { recRef.current?.stop && recRef.current.stop(); } catch {}
-      recRef.current = null;
-      // clear any timers/raf
-      if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-      if (moveRafRef.current !== null) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
-      // clear hover markers
-      setHoverTargetId(null);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // small UI helpers
-  const orbStyle: React.CSSProperties = {
-    position: "fixed",
-    left: pos.x,
-    top: pos.y,
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE,
-    zIndex: 9999,
-    display: "grid",
-    placeItems: "center",
-    cursor: "grab",
-    boxShadow: mic
-      ? "0 16px 40px rgba(255,116,222,0.22), 0 0 0 12px rgba(255,116,222,0.12)"
-      : "0 12px 30px rgba(0,0,0,0.35)",
-    background: "radial-gradient(120% 120% at 30% 30%, #fff, #ffd7f5 60%, #ff74de)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    touchAction: "none", // prevents browser gestures
-    userSelect: "none",
-    WebkitUserSelect: "none",
-  };
-
-  const coreStyle: React.CSSProperties = {
-    width: ORB_SIZE - 20,
-    height: ORB_SIZE - 20,
-    borderRadius: "50%",
-    background: "radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0.28) 65%, transparent 70%)",
-    display: "grid",
-    placeItems: "center",
-    pointerEvents: "none",
-  };
-
-  const toastStyle: React.CSSProperties = {
-    position: "fixed",
-    right: pos.x + ORB_SIZE + 8,
-    top: pos.y + ORB_SIZE / 2 - 18,
-    transform: "translateY(-50%)",
-    background: "rgba(0,0,0,0.7)",
-    color: "#fff",
-    padding: "6px 10px",
-    borderRadius: 10,
-    fontSize: 13,
-    zIndex: 9998,
-    pointerEvents: "none",
-  };
-
-  // ---------- render ----------
   return (
     <>
       <button
-        aria-label="Assistant orb"
-        title="Assistant — hold to talk, drag to react"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onLostPointerCapture={handlePointerEnd}
-        onClick={onClick}
+        className={`assistant-orb ${mic ? "mic" : ""}`}
         style={orbStyle}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onClick={onClick}
+        aria-label="Assistant orb"
+        title={mic ? "Listening… (click to toggle)" : "Assistant — click to open chat, hold to talk"}
       >
-        <div style={coreStyle} />
-        {/* tiny mic ring (visual) */}
-        <div
-          style={{
-            position: "absolute",
-            inset: -8,
-            borderRadius: "50%",
-            pointerEvents: "none",
-            boxShadow: mic ? "0 0 0 8px rgba(255,116,222,0.12)" : "none",
-            transition: "box-shadow .25s ease",
-          }}
-        />
+        <span className="assistant-orb__core" />
+        <span className="assistant-orb__ring" />
+        {!!toast && <span className="assistant-orb__toast">{toast}</span>}
       </button>
 
-      {/* toast + interim transcripts */}
-      {toast && <div style={toastStyle}>{toast}</div>}
-      {interim ? (
-        <div style={{ ...toastStyle, right: pos.x + ORB_SIZE + 8, top: pos.y - 28 }}>{interim}</div>
-      ) : null}
-
-      {/* simple expand panel when open — minimal inline UI */}
       {open && (
-        <div
-          style={{
-            position: "fixed",
-            right: Math.min(window.innerWidth - ORB_MARGIN - ORB_SIZE - 8, pos.x + ORB_SIZE + 8),
-            top: Math.max(ORB_MARGIN, pos.y - 160),
-            width: 320,
-            maxWidth: "40vw",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02))",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 12,
-            padding: 12,
-            zIndex: 9998,
-            boxShadow: "0 12px 36px rgba(0,0,0,0.45)",
-            backdropFilter: "blur(8px) saturate(120%)",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Assistant</div>
-          <div style={{ fontSize: 13, color: "var(--muted, #bfc6d8)" }}>
-            {msgs.length ? msgs[msgs.length - 1].text : "Hi — hold to speak or type below."}
+        <div className="assistant-petal">
+          <div className="ap-head">
+            <div className="ap-dot" />
+            <div className="ap-title">
+              Assistant
+              <div className="ap-sub">
+                {ctxPost ? `linked: ${ctxPost.title || ctxPost.author || ctxPost.id}` : "no post context"}
+              </div>
+            </div>
+            <button className="ap-btn" onClick={() => setOpen(false)} aria-label="Close">✕</button>
           </div>
-          <div style={{ height: 8 }} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => { startListening(); setToast("Listening…"); }}
-              style={{ flex: 1, height: 36, borderRadius: 8, border: "none", background: "#ff74de", color: "#111", fontWeight: 700 }}
-            >
-              🎤 Speak
-            </button>
-            <button
-              onClick={() => { stopListening(); setToast(""); }}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", background: "transparent", color: "#fff" }}
-            >
-              ✖
-            </button>
+
+          <div className="ap-emojis">
+            {EMOJI_LIST.map(emoji => (
+              <button key={emoji} className="emoji-btn" onClick={() => handleEmojiClick(emoji)}>
+                {emoji}
+              </button>
+            ))}
           </div>
+
+          <div className="ap-body">
+            {msgs.length === 0 && (
+              <div className="ap-hint">
+                Try: <code>/comment hi</code> <code>/react ❤️</code> <code>/world</code> <code>/remix</code>
+              </div>
+            )}
+            {msgs.map(m => (
+              <div key={m.id} className={`ap-msg ${m.role}`}>
+                <div className="ap-msg-bubble">{m.text}</div>
+              </div>
+            ))}
+            {interim && (
+              <div className="ap-msg assistant">
+                <div className="ap-msg-bubble">…{interim}</div>
+              </div>
+            )}
+          </div>
+
+          <form className="ap-form" onSubmit={async e => { e.preventDefault(); if (!input.trim()) return; const t = input.trim(); setInput(""); await handleCommand(t); }}>
+            <input
+              className="ap-input"
+              placeholder="Type /comment /react ❤️ /world /remix"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+            />
+            <button className={`ap-mic ${mic ? "on" : ""}`} type="button" onClick={() => (mic ? stopListening() : startListening())} aria-label="Mic">
+              {mic ? "🎙️" : "🎤"}
+            </button>
+            <button className="ap-send" type="submit" aria-label="Send">➤</button>
+          </form>
         </div>
       )}
+
+      {/* CSS injected locally to avoid touching global styles */}
+      <style>{`
+:root{ --orb-size: 76px; --pink:#ff74de; --blue:#4f7afe; }
+
+/* Assistant Orb (hot pink) */
+.assistant-orb{
+  position:fixed; z-index:75; width:var(--orb-size); height:var(--orb-size); border-radius:50%;
+  border:1px solid rgba(255,255,255,.12); overflow:hidden;
+  transform:translate(-50%,-50%); left:${pos.x}px; top:${pos.y}px;
+  transition:left .16s ease, top .16s ease, box-shadow .2s ease, filter .2s ease;
+  display:grid; place-items:center; cursor:grab;
+  background: radial-gradient(120% 120% at 30% 30%, #fff, #ffd7f5 60%, var(--pink));
+  box-shadow: 0 12px 30px rgba(0,0,0,.35), 0 0 0 8px color-mix(in srgb, var(--pink) 20%, transparent);
+}
+.assistant-orb.mic{
+  box-shadow: 0 12px 30px rgba(0,0,0,.35), 0 0 0 10px color-mix(in srgb, var(--pink) 28%, transparent);
+}
+.assistant-orb__core{
+  width:56px; height:56px; border-radius:50%;
+  background: radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,.95), rgba(255,255,255,.28) 65%, transparent 70%);
+}
+.assistant-orb__ring{ position:absolute; inset:-4px; border-radius:50%; box-shadow: inset 0 0 24px rgba(255,255,255,.55); }
+.assistant-orb:hover{ filter:saturate(115%) }
+.assistant-orb.mic .assistant-orb__ring{ animation: orb-ping 1.4s ease-out infinite }
+@keyframes orb-ping{ 0%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--pink) 28%, transparent);} 100%{ box-shadow:0 0 0 28px rgba(0,0,0,0);} }
+.assistant-orb__toast{
+  position:absolute; right:72px; top:50%; transform:translateY(-50%);
+  white-space:nowrap; padding:6px 8px; border-radius:8px;
+  background: rgba(0,0,0,.65); color:#fff; font-size:12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.25); pointer-events:none;
+}
+
+/* Petal (drawer) */
+.assistant-petal {
+  position: fixed; z-index: 76; width: min(680px, 92vw); max-height: 80vh;
+  display: flex; flex-direction: column;
+  bottom: 0; left: 50%; transform: translateX(-50%);
+  background: rgba(26,28,38,.6);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(180%);
+  box-shadow: 0 18px 48px rgba(0,0,0,.45); overflow: hidden;
+  animation: petalIn .4s ease-out;
+}
+@keyframes petalIn { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+.ap-head { display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.12); }
+.ap-dot {
+  width:22px; height:22px; border-radius: 999px;
+  border:1px solid rgba(255,255,255,.2);
+  box-shadow:0 0 0 4px color-mix(in srgb, var(--pink) 20%, transparent);
+  background: radial-gradient(120% 120% at 30% 30%, #fff, #ffc6f3 60%, var(--pink));
+}
+.ap-title { font-weight:800; }
+.ap-sub { font-size:12px; opacity:.8; }
+.ap-btn { margin-left:auto; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); color:#fff; height:28px; padding:0 10px; border-radius:8px; cursor:pointer; }
+
+.ap-body { padding:10px 12px; overflow:auto; display:flex; flex-direction:column; gap:8px; max-height:280px; }
+.ap-hint { opacity:.8; }
+.ap-msg { display:flex; }
+.ap-msg.user { justify-content:flex-end; }
+.ap-msg-bubble {
+  max-width: 78%;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.16);
+  padding: 8px 10px; border-radius:12px;
+}
+.ap-msg.user .ap-msg-bubble { background: rgba(255,255,255,.14); }
+
+.ap-form { display:flex; gap:8px; padding:10px 12px; border-top:1px solid rgba(255,255,255,.12); }
+.ap-input {
+  flex:1; height:36px; padding:0 10px; border-radius:10px; outline:0;
+  background: rgba(16,18,28,.65); border:1px solid rgba(255,255,255,.16); color:#fff;
+}
+.ap-mic, .ap-send {
+  height:36px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.08); color:#fff; cursor:pointer;
+}
+.ap-mic.on { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pink) 25%, transparent) inset; }
+
+/* Emoji grid */
+.ap-emojis { display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px; max-height:200px; overflow-y:auto; }
+.emoji-btn { background:none; border:none; font-size:24px; cursor:pointer; padding:4px; border-radius:6px; transition: transform .1s ease, background .1s ease; }
+.emoji-btn:hover { background: rgba(255,255,255,.1); transform: scale(1.1); }
+      `}</style>
     </>
   );
 }
