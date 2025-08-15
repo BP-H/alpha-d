@@ -144,9 +144,23 @@ export default function AssistantOrb() {
     if (!C) { setToast("Voice not supported"); return null; }
     const rec = new C();
     rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-    rec.onstart = () => setToast("Listening…");
-    rec.onend = () => { setToast(""); if (restartRef.current) { try { rec.start(); } catch {} } };
-    rec.onerror = () => setToast("Mic error");
+    rec.onstart = () => {
+      setMic(true);
+      setToast("Listening…");
+    };
+    rec.onend = () => {
+      setMic(false);
+      setToast("");
+      if (restartRef.current) {
+        try {
+          rec.start();
+        } catch {}
+      }
+    };
+    rec.onerror = () => {
+      setMic(false);
+      setToast("Mic error");
+    };
     rec.onresult = async (e: any) => {
       let tmp = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -163,8 +177,26 @@ export default function AssistantOrb() {
     recRef.current = rec;
     return rec;
   }
-  function startListening(){ const r = ensureRec(); if (!r) return; restartRef.current = true; try { r.start(); } catch {} setMic(true); }
-  function stopListening(){ restartRef.current = false; try { recRef.current?.stop(); } catch {} setMic(false); setInterim(""); }
+  function startListening() {
+    if (mic) return;
+    const r = ensureRec();
+    if (!r) return;
+    restartRef.current = true;
+    try {
+      r.start();
+    } catch {
+      setMic(false);
+      setToast("Mic error");
+    }
+  }
+  function stopListening() {
+    restartRef.current = false;
+    try {
+      recRef.current?.stop();
+    } catch {}
+    setMic(false);
+    setInterim("");
+  }
 
   /** Commands */
   async function handleCommand(text: string) {
