@@ -4,13 +4,11 @@ import bus from "../lib/bus";
 import type { AssistantMessage, Post } from "../types";
 
 /**
- * AssistantOrb.tsx
- * Improved Assistant Orb - smoother animations and better performance.
- *
- * This file replaces the previous AssistantOrb with performance optimizations.
+ * Assistant Orb — pink, draggable, hold-to-talk, drag over a post to link.
+ * Full replacement. No external CSS; styles are inline.
  */
 
-/* Small helpful types for SpeechRecognition (loose) */
+/* Loose SpeechRecognition type to avoid dom lib juggling */
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -26,10 +24,13 @@ type SpeechRecognitionLike = {
 const ORB_SIZE = 76;
 const ORB_MARGIN = 12;
 const ORB_RADIUS = ORB_SIZE / 2;
+const HOLD_MS = 280;
+
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
+const within = (n: number, tol: number) => Math.abs(n) <= tol;
 
 export default function AssistantOrb() {
-  // ---------- position state (top-left coords) ----------
+  // ---------- position (top/left) ----------
   const [pos, setPos] = useState(() => {
     if (typeof window === "undefined") return { x: 0, y: 0 };
     return {
@@ -38,7 +39,7 @@ export default function AssistantOrb() {
     };
   });
 
-  // keep pos within bounds on resize
+  // keep inside viewport on resize
   useEffect(() => {
     const onResize = () => {
       setPos((p) => ({
@@ -50,7 +51,8 @@ export default function AssistantOrb() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // ---------- refs for dragging logic ----------
+  // ---------- drag state ----------
+  const [dragging, setDragging] = useState(false);
   const pressRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
   const movedRef = useRef(false);
   const holdTimerRef = useRef<number | null>(null);
@@ -59,32 +61,32 @@ export default function AssistantOrb() {
   const hoverIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
 
-  // ---------- chat + mic state ----------
+  // ---------- chat + mic ----------
   const [open, setOpen] = useState(false);
   const [mic, setMic] = useState(false);
   const [interim, setInterim] = useState("");
   const [toast, setToast] = useState("");
   const [msgs, setMsgs] = useState<AssistantMessage[]>([]);
   const [ctxPost, setCtxPost] = useState<Post | null>(null);
-  const [dragging, setDragging] = useState(false);
 
-  // subscribe to context (feed hover/select)
   useEffect(() => {
-    const unsub1 = bus.on?.("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
-    const unsub2 = bus.on?.("feed:select", (p: { post: Post }) => setCtxPost(p.post));
+    const u1 = bus.on?.("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
+    const u2 = bus.on?.("feed:select", (p: { post: Post }) => setCtxPost(p.post));
     return () => {
-      try { unsub1?.(); } catch {}
-      try { unsub2?.(); } catch {}
+      try { u1?.(); } catch {}
+      try { u2?.(); } catch {}
     };
   }, []);
 
-  // ---------- speech recognition refs ----------
+  // ---------- speech recognition ----------
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const restartRef = useRef(false);
 
   function ensureRec(): SpeechRecognitionLike | null {
     if (recRef.current) return recRef.current;
-    const C = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    const C =
+      (typeof window !== "undefined" && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition)) ||
+      null;
     if (!C) {
       setToast("Voice not supported");
       return null;
@@ -102,7 +104,7 @@ export default function AssistantOrb() {
       setMic(false);
       setToast("");
       if (restartRef.current) {
-        try { rec.start && rec.start(); } catch {}
+        try { rec.start?.(); } catch {}
       }
     };
     rec.onerror = () => {
@@ -110,7 +112,6 @@ export default function AssistantOrb() {
       setToast("Mic error");
     };
     rec.onresult = (e: any) => {
-      // build interim & final transcripts
       let interimT = "";
       const finals: string[] = [];
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -136,16 +137,21 @@ export default function AssistantOrb() {
     const r = ensureRec();
     if (!r) return;
     restartRef.current = true;
-    try { r.start && r.start(); } catch (e) { setToast("Mic error"); setMic(false); }
+    try {
+      r.start?.();
+    } catch {
+      setMic(false);
+      setToast("Mic error");
+    }
   }
   function stopListening() {
     restartRef.current = false;
-    try { recRef.current?.stop && recRef.current.stop(); } catch {}
+    try { recRef.current?.stop?.(); } catch {}
     setMic(false);
     setInterim("");
   }
 
-  // ---------- command handler (simplified) ----------
+  // ---------- commands (minimal) ----------
   async function handleCommand(text: string) {
     const post = ctxPost || null;
     const push = (m: AssistantMessage) => setMsgs((s) => [...s, m]);
@@ -159,36 +165,41 @@ export default function AssistantOrb() {
       const emoji = T.replace("/react", "").trim() || "❤️";
       if (post) {
         bus.emit("post:react", { id: post.id, emoji });
-        push({ id: crypto.randomUUID(), role: "assistant", text: `✨ Reacted ${emoji} on ${post.id}`, ts: Date.now(), postId: (post.id as any) });
+        push({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: `✨ Reacted ${emoji} on ${post.id}`,
+          ts: Date.now(),
+          postId: (post.id as any),
+        });
       } else {
-        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ No post selected. Drag the orb over a post.`, ts: Date.now() });
+        push({ id: crypto.randomUUID(), role: "assistant", text: `⚠️ Drag the orb over a post first.`, ts: Date.now() });
       }
       return;
     }
 
     // fallback reply stub
-    push({ id: crypto.randomUUID(), role: "assistant", text: `🤖 I heard: "${T}" (stub)`, ts: Date.now() });
+    push({ id: crypto.randomUUID(), role: "assistant", text: `🤖 I heard: “${T}” (stub)`, ts: Date.now() });
   }
 
-  // ---------- helpers for hover highlight ----------
+  // ---------- hover helpers ----------
   function setHoverTargetId(id: string | null) {
-    // clear previous
     if (hoverIdRef.current) {
       document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)?.classList.remove("pc-target");
       hoverIdRef.current = null;
     }
     if (id) {
-      const target = document.querySelector(`[data-post-id="${id}"]`) as HTMLElement | null;
-      if (target) {
-        target.classList.add("pc-target");
+      const el = document.querySelector(`[data-post-id="${id}"]`) as HTMLElement | null;
+      if (el) {
+        el.classList.add("pc-target");
         hoverIdRef.current = id;
       }
     }
   }
 
-  // ---------- core pointer handlers ----------
+  // ---------- pointer handlers ----------
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
-    // capture pointer
+    // capture pointer and remember offset from orb origin
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     const offsetX = e.clientX - pos.x;
     const offsetY = e.clientY - pos.y;
@@ -196,13 +207,13 @@ export default function AssistantOrb() {
     movedRef.current = false;
     suppressClickRef.current = false;
     setDragging(true);
+
     // hold-to-talk
-    if (holdTimerRef.current !== null) { window.clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+    if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); }
     holdTimerRef.current = window.setTimeout(() => {
-      // if held long enough, start listening and mark so a click is suppressed
       suppressClickRef.current = true;
       startListening();
-    }, 280);
+    }, HOLD_MS);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
@@ -214,19 +225,34 @@ export default function AssistantOrb() {
       const cur = lastPointerRef.current;
       const pr = pressRef.current;
       if (!cur || !pr) return;
-      const nx = clamp(cur.x - pr.offsetX, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerWidth - ORB_SIZE - ORB_MARGIN));
-      const ny = clamp(cur.y - pr.offsetY, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - ORB_SIZE - ORB_MARGIN));
-      const dx = Math.abs(nx - pos.x);
-      const dy = Math.abs(ny - pos.y);
-      if (!movedRef.current && Math.hypot(dx, dy) < 4) return;
+
+      const nx = clamp(
+        cur.x - pr.offsetX,
+        ORB_MARGIN,
+        Math.max(ORB_MARGIN, window.innerWidth - ORB_SIZE - ORB_MARGIN)
+      );
+      const ny = clamp(
+        cur.y - pr.offsetY,
+        ORB_MARGIN,
+        Math.max(ORB_MARGIN, window.innerHeight - ORB_SIZE - ORB_MARGIN)
+      );
+
+      const dx = nx - pos.x;
+      const dy = ny - pos.y;
+      if (!movedRef.current && within(Math.hypot(dx, dy), 3)) return;
+
       movedRef.current = true;
-      // cancel hold-to-talk if we start dragging
+      // cancel hold if we started moving
       if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
       setPos({ x: nx, y: ny });
 
-      // highlight post under pointer
-      const el = document.elementFromPoint(cur.x, cur.y) as HTMLElement | null;
-      const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
+      // while dragging, let elementFromPoint see content under the pointer
+      // (pointer-capture ensures we still receive events)
+      // We toggle pointerEvents via "dragging" state in style.
+
+      // highlight post under cursor
+      const under = document.elementFromPoint(cur.x, cur.y) as HTMLElement | null;
+      const target = under?.closest?.("[data-post-id]") as HTMLElement | null;
       const id = target?.dataset.postId || null;
       if (id !== hoverIdRef.current) {
         setHoverTargetId(id);
@@ -235,8 +261,7 @@ export default function AssistantOrb() {
     });
   }
 
-  function handlePointerEnd(e: React.PointerEvent<HTMLButtonElement>) {
-    // common cleanup for up/cancel/lostcapture
+  function endPointer(e: React.PointerEvent<HTMLButtonElement>) {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
     if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
     if (moveRafRef.current !== null) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
@@ -245,110 +270,202 @@ export default function AssistantOrb() {
     const dragged = movedRef.current;
     movedRef.current = false;
     pressRef.current = null;
+    setDragging(false);
 
-    // if microphoned and a suppressed click (i.e. we started listening via hold) -> stop listening and link to post if dragged
+    // stop listening if we started via hold
     if (mic && suppressClickRef.current) {
       stopListening();
-      // attempt to link to a post under pointer
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      const target = el?.closest?.("[data-post-id]") as HTMLElement | null;
+      // link to post under pointer if we dragged
+      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const target = under?.closest?.("[data-post-id]") as HTMLElement | null;
       if (dragged && target) {
         const id = target.dataset.postId!;
         bus.emit("post:focus", { id });
         setToast(`🎯 linked to ${id}`);
         window.setTimeout(() => setToast(""), 1100);
       }
-    } else {
-      // if not a mic-suppressed flow and we dragged, just persist pos (already set by onMove)
-      if (!dragged) {
-        // click occurred (if not suppressed)
-      }
     }
 
     // clear hover highlight
-    setDragging(false);
     setHoverTargetId(null);
 
-    // reset suppressClick in next frame (safer)
+    // release click suppression next frame
     requestAnimationFrame(() => { suppressClickRef.current = false; });
   }
 
-  function onClick(e?: React.MouseEvent) {
+  function onClick() {
     if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     setOpen((v) => !v);
   }
 
-  // bind pointercancel & lostcapture to same handler
-  // (handlers will be attached to the button element below)
-
   // ---------- unmount cleanup ----------
   useEffect(() => {
     return () => {
-      // stop recognition & prevent restarts
       restartRef.current = false;
-      try { recRef.current?.stop && recRef.current.stop(); } catch {}
+      try { recRef.current?.stop?.(); } catch {}
       recRef.current = null;
-      // clear any timers/raf
       if (holdTimerRef.current !== null) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
       if (moveRafRef.current !== null) { cancelAnimationFrame(moveRafRef.current); moveRafRef.current = null; }
-      // clear hover markers
       setHoverTargetId(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sideClass = (pos.x + ORB_RADIUS) > (window.innerWidth / 2) ? 'left' : 'right';
-  const panelW = typeof window !== 'undefined' ? Math.min(320, window.innerWidth * 0.4) : 320;
-  const panelLeft = Math.min(pos.x + ORB_SIZE + 8, (window.innerWidth || 0) - ORB_MARGIN - panelW);
-  const panelTop = pos.y < (window.innerHeight || 0) * 0.25
-    ? pos.y + ORB_SIZE + 8
-    : Math.max(ORB_MARGIN, pos.y - 160);
+  // ---------- styles ----------
+  const orbStyle: React.CSSProperties = {
+    position: "fixed",
+    left: pos.x,
+    top: pos.y,
+    width: ORB_SIZE,
+    height: ORB_SIZE,
+    borderRadius: ORB_SIZE,
+    zIndex: 9999,
+    display: "grid",
+    placeItems: "center",
+    cursor: dragging ? "grabbing" : "grab",
+    boxShadow: mic
+      ? "0 18px 44px rgba(255,116,222,0.24), 0 0 0 12px rgba(255,116,222,0.12)"
+      : "0 12px 30px rgba(0,0,0,0.35)",
+    background: "radial-gradient(120% 120% at 30% 30%, #fff, #ffd7f5 60%, #ff74de)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    touchAction: "none",
+    userSelect: "none",
+    WebkitUserSelect: "none",
+    // 👇 key to glitch-free hover while dragging
+    pointerEvents: dragging ? ("none" as const) : ("auto" as const),
+    transition: dragging ? "none" : "box-shadow .2s ease",
+  };
+
+  const coreStyle: React.CSSProperties = {
+    width: ORB_SIZE - 20,
+    height: ORB_SIZE - 20,
+    borderRadius: "50%",
+    background:
+      "radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,0.95), rgba(255,255,255,0.28) 65%, transparent 70%)",
+    display: "grid",
+    placeItems: "center",
+    pointerEvents: "none",
+  };
+
+  const panelSideRight = pos.x < window.innerWidth / 2; // if orb is on left half, open panel to its right
+  const panelXStyle: React.CSSProperties = panelSideRight
+    ? { left: pos.x + ORB_SIZE + 8 }
+    : { right: Math.max(ORB_MARGIN, window.innerWidth - pos.x + 8) };
+  const panelTop = clamp(pos.y - 160, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - 260));
+
+  const panelStyle: React.CSSProperties = {
+    position: "fixed",
+    top: panelTop,
+    ...panelXStyle,
+    width: 320,
+    maxWidth: "42vw",
+    background: "linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02))",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 12,
+    zIndex: 9998,
+    boxShadow: "0 12px 36px rgba(0,0,0,0.45)",
+    backdropFilter: "blur(8px) saturate(120%)",
+  };
+
+  const toastStyle: React.CSSProperties = {
+    position: "fixed",
+    left: pos.x + ORB_SIZE + 8,
+    top: pos.y + ORB_RADIUS,
+    transform: "translateY(-50%)",
+    background: "rgba(0,0,0,0.7)",
+    color: "#fff",
+    padding: "6px 10px",
+    borderRadius: 10,
+    fontSize: 13,
+    zIndex: 9998,
+    pointerEvents: "none",
+  };
 
   // ---------- render ----------
   return (
     <>
       <button
         aria-label="Assistant orb"
-        title="Assistant — hold to talk, drag to react"
-        className={`assistant-orb${mic ? " mic" : ""}${dragging ? " flying" : ""}`}
-        style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+        title="Assistant — hold to talk, drag to link a post"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onLostPointerCapture={handlePointerEnd}
-        onClick={onClick}>
-        <div className="assistant-orb__core" />
-        {/* tiny mic ring (visual) */}
-        <div className="assistant-orb__ring" />
+        onPointerUp={endPointer}
+        onPointerCancel={endPointer}
+        onLostPointerCapture={endPointer}
+        onClick={onClick}
+        style={orbStyle}
+      >
+        <div style={coreStyle} />
+        {/* subtle pink ring when listening */}
+        <div
+          style={{
+            position: "absolute",
+            inset: -8,
+            borderRadius: "50%",
+            pointerEvents: "none",
+            boxShadow: mic ? "0 0 0 10px rgba(255,116,222,0.16)" : "none",
+            transition: "box-shadow .25s ease",
+          }}
+        />
       </button>
 
-      {/* toast + interim transcripts */}
-      {toast && <div className={`assistant-orb__toast ${sideClass}`}>{toast}</div>}
-      {interim && <div className={`assistant-orb__toast ${sideClass} interim`}>{interim}</div>}
+      {toast && <div style={toastStyle}>{toast}</div>}
+      {interim ? (
+        <div
+          style={{
+            ...toastStyle,
+            top: pos.y - 28,
+          }}
+        >
+          {interim}
+        </div>
+      ) : null}
 
-      {/* simple expand panel when open — minimal inline UI */}
-      {open && <div className="assistant-panel" style={{ left: panelLeft, top: panelTop }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Assistant</div>
+      {open && (
+        <div style={panelStyle}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Assistant</div>
           <div style={{ fontSize: 13, color: "var(--muted, #bfc6d8)" }}>
             {msgs.length ? msgs[msgs.length - 1].text : "Hi — hold to speak or type below."}
           </div>
           <div style={{ height: 8 }} />
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={() => { startListening(); setToast("Listening…"); }}
-              style={{ flex: 1, height: 36, borderRadius: 8, border: "none", background: "#ff74de", color: "#111", fontWeight: 700 }}
+              onClick={() => {
+                startListening();
+                setToast("Listening…");
+              }}
+              style={{
+                flex: 1,
+                height: 36,
+                borderRadius: 8,
+                border: "none",
+                background: "#ff74de",
+                color: "#111",
+                fontWeight: 800,
+              }}
             >
               🎤 Speak
             </button>
             <button
-              onClick={() => { stopListening(); setToast(""); }}
-              style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", background: "transparent", color: "#fff" }}
+              onClick={() => {
+                stopListening();
+                setToast("");
+              }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "transparent",
+                color: "#fff",
+              }}
             >
               ✖
             </button>
           </div>
-        </div>}
+        </div>
+      )}
     </>
   );
 }
