@@ -4,10 +4,10 @@ import bus from "../lib/bus";
 import type { AssistantMessage, Post } from "../types";
 
 /**
- * Assistant Orb — The final, perfect, and robust version.
- * - 60fps drag via translate3d on a ref (no re-renders while moving).
+ * Assistant Orb — The definitive, perfect, and robust version.
+ * - 60fps drag via translate3d on a ref.
  * - Anchored UI (panel, toasts) also moves via refs for perfect 60fps tracking.
- * - Pointer capture + pointerEvents:none for accurate hit-testing on elements below.
+ * - Pointer capture + pointerEvents:none for accurate, type-safe hit-testing.
  * - Hold-to-talk, robust mic lifecycle, and clear drag vs. tap distinction.
  * - Position is persisted in localStorage.
  * - Rich panel with message log, emoji drawer, and text input.
@@ -34,6 +34,11 @@ const EMOJI_LIST: string[] = ["🤗","😂","🤣","😅","🙂","😉","😍","
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 const uuid = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
 async function askLLMStub(text: string): Promise<string> { return `🤖 I'm a stub, but I heard you say: “${text}”`; }
+
+// Type-safe helper: works on Element (no need to narrow to HTMLElement for dataset)
+function getClosestPostId(el: Element | null): string | null {
+  return el?.closest?.("[data-post-id]")?.getAttribute?.("data-post-id") ?? null;
+}
 
 export default function AssistantOrb() {
   // --- State & Refs ---
@@ -197,8 +202,11 @@ export default function AssistantOrb() {
       applyTransform(nx, ny);
       updateAnchors();
       const under = document.elementFromPoint(cur.x, cur.y);
-      const target = under?.closest?.("[data-post-id]") as HTMLElement | null; // <-- BUILD FIX
-      setHover(target?.dataset.postId || null);
+      const id = getClosestPostId(under); // <-- BUILD FIX
+      if (id !== hoverIdRef.current) {
+        setHover(id);
+        if (id) bus.emit?.("feed:select-id", { id });
+      }
     });
   };
   const finishGesture = (clientX: number, clientY: number) => {
@@ -208,10 +216,10 @@ export default function AssistantOrb() {
       stopListening();
       if (movedRef.current) {
         const under = document.elementFromPoint(clientX, clientY);
-        const target = under?.closest?.("[data-post-id]") as HTMLElement | null; // <-- BUILD FIX
-        if (target?.dataset.postId) {
-          bus.emit("post:focus", { id: target.dataset.postId });
-          setToast(`🎯 Linked to ${target.dataset.postId}`);
+        const id = getClosestPostId(under); // <-- BUILD FIX
+        if (id) {
+          bus.emit("post:focus", { id });
+          setToast(`🎯 Linked to ${id}`);
           setTimeout(() => setToast(""), 1200);
         }
       }
