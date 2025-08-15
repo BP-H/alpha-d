@@ -1,33 +1,48 @@
+// src/hooks/useShare.ts
 import bus from "../lib/bus";
+import type { Post } from "../types";
+import {
+  sharePost as shareCore,
+  type ShareOptions,
+} from "../lib/share";
 
 /**
- * Share a post link using the Web Share API when available.
- * Falls back to copying the URL to the clipboard and emitting a toast.
+ * Back-compat overloads:
+ * - sharePost(url, title?)
+ * - sharePost(Post | ShareOptions | string)
+ * Returns true if sharing/copy succeeded, false otherwise.
  */
-export async function sharePost(url: string, title?: string) {
+export function sharePost(url: string, title?: string): Promise<boolean>;
+export function sharePost(arg: Post | ShareOptions | string): Promise<boolean>;
+export async function sharePost(arg: any, title?: string): Promise<boolean> {
   try {
-    if (navigator.share) {
-      await navigator.share({ url, title });
-      return;
+    // Old signature: (url: string, title?: string)
+    if (typeof arg === "string" && (title === undefined || typeof title === "string")) {
+      return await shareCore({ url: arg || (typeof location !== "undefined" ? location.href : ""), title });
     }
-  } catch (err) {
-    // ignore abort errors but log others
-    if ((err as any)?.name !== "AbortError") console.error(err);
-  }
-
-  try {
-    await navigator.clipboard.writeText(url);
-    bus.emit("toast", "Link copied to clipboard");
-  } catch (err) {
-    bus.emit("toast", "Copy failed");
-    console.error(err);
+    // New unified signature: (Post | ShareOptions | string)
+    return await shareCore(arg);
+  } catch {
+    // Ensure a consistent boolean on unexpected errors
+    return false;
   }
 }
 
 /**
- * Emit a repost event so other parts of the app can duplicate a card.
+ * Repost helper – keeps existing event semantics.
  */
-export function repostPost(id: string) {
+export function repostPost(id: string | number) {
   bus.emit("feed:repost", id);
 }
 
+/**
+ * Optional tiny hook for convenient imports.
+ */
+export function useShare() {
+  return {
+    sharePost,
+    repostPost,
+  };
+}
+
+export type { ShareOptions };
