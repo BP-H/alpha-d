@@ -14,9 +14,15 @@ export default function PortalOrb({ onAnalyzeImage }: Props) {
   const holdRef = useRef<number | null>(null);
   const [mode, setMode] = useState<Mode>("idle");
   const [menuOpen, setMenuOpen] = useState(false);
+  // Guard localStorage access for non-browser environments (e.g., SSR)
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
-    const saved = localStorage.getItem("orb-pos");
-    return saved ? JSON.parse(saved) : { x: 16, y: 16 };
+    if (typeof window === "undefined") return { x: 16, y: 16 };
+    try {
+      const saved = window.localStorage.getItem("orb-pos");
+      return saved ? JSON.parse(saved) : { x: 16, y: 16 };
+    } catch {
+      return { x: 16, y: 16 };
+    }
   });
   const [dragging, setDragging] = useState(false);
   const lastTap = useRef<number>(0);
