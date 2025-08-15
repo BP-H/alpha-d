@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, CSSProperties } from "react";
 
 type Props = {
   onAnalyzeImage: (imgUrl: string) => void;
@@ -141,6 +141,72 @@ export default function PortalOrb({ onAnalyzeImage }: Props) {
     analyzeOverlay.current.style.setProperty("--y", `${e.clientY}px`);
   }
 
+  const RADIUS = 94;
+  const items = [
+    {
+      key: "analyze",
+      label: "Analyze",
+      onClick: startAnalyze,
+      icon: (
+        <svg viewBox="0 0 24 24" className="ico">
+          <path
+            d="M15.5 15.5L21 21"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="square"
+          />
+          <circle
+            cx="10"
+            cy="10"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "compose",
+      label: "Compose",
+      onClick: () => {
+        setMenuOpen(false);
+        orbRef.current?.classList.remove("grow");
+        // placeholder “compose” action
+        alert("Compose: hook this to your AI API.");
+      },
+      icon: (
+        <svg className="ico" viewBox="0 0 24 24">
+          <path
+            d="M4 20h16M4 4h12l4 4v8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "close",
+      label: "Close",
+      onClick: () => {
+        setMode("idle");
+        setMenuOpen(false);
+        orbRef.current?.classList.remove("grow");
+      },
+      icon: (
+        <svg className="ico" viewBox="0 0 24 24">
+          <path
+            d="M5 5l14 14M19 5L5 19"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+        </svg>
+      ),
+    },
+  ];
+
   return (
     <>
       <div
@@ -160,64 +226,27 @@ export default function PortalOrb({ onAnalyzeImage }: Props) {
         {/* radial menu */}
         {menuOpen && (
           <div className="radial-menu">
-            <button className="rm-item" onClick={startAnalyze} title="Analyze">
-              <svg viewBox="0 0 24 24" className="ico">
-                <path
-                  d="M15.5 15.5L21 21"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="square"
-                />
-                <circle
-                  cx="10"
-                  cy="10"
-                  r="6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  fill="none"
-                />
-              </svg>
-              <span>Analyze</span>
-            </button>
-            <button
-              className="rm-item"
-              onClick={() => {
-                setMenuOpen(false);
-                orbRef.current?.classList.remove("grow");
-                // placeholder “compose” action
-                alert("Compose: hook this to your AI API.");
-              }}
-              title="Compose"
-            >
-              <svg className="ico" viewBox="0 0 24 24">
-                <path
-                  d="M4 20h16M4 4h12l4 4v8"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-              <span>Compose</span>
-            </button>
-            <button
-              className="rm-item"
-              onClick={() => {
-                setMode("idle");
-                setMenuOpen(false);
-                orbRef.current?.classList.remove("grow");
-              }}
-              title="Close"
-            >
-              <svg className="ico" viewBox="0 0 24 24">
-                <path
-                  d="M5 5l14 14M19 5L5 19"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-              <span>Close</span>
-            </button>
+            {items.map((item, i) => {
+              const angle = (360 / items.length) * i;
+              const rad = (angle * Math.PI) / 180;
+              const x = RADIUS * Math.cos(rad);
+              const y = RADIUS * Math.sin(rad);
+              return (
+                <button
+                  key={item.key}
+                  className="rm-item"
+                  style={{
+                    "--tx": `${x}px`,
+                    "--ty": `${y}px`,
+                  } as CSSProperties}
+                  onClick={item.onClick}
+                  title={item.label}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -265,10 +294,8 @@ export default function PortalOrb({ onAnalyzeImage }: Props) {
           position:absolute;pointer-events:auto;
           display:grid;place-items:center;gap:6px;padding:6px 8px;background:rgba(16,18,24,.9);
           border:1px solid var(--stroke-2);color:#fff;
+          transform:translate(var(--tx),var(--ty));
         }
-        .rm-item:nth-child(1){transform:translate(-94px,0)}
-        .rm-item:nth-child(2){transform:translate(94px,0)}
-        .rm-item:nth-child(3){transform:translate(0,94px)}
         .rm-item .ico{width:18px;height:18px}
         .analyzing .orb-core{ box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 10px 70px rgba(10,132,255,.7) }
       `}</style>
