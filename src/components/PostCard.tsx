@@ -17,22 +17,21 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
     (post as any).image ||
     ((post as any).images?.[0] as string | undefined);
   const video = (post as any).video as string | undefined;
+  const pdf = (post as any).pdf as string | undefined;
+  const model3d = (post as any).model3d as string | undefined;
   const mediaFallback = "/vite.svg";
 
-  const onMediaReady = (
-    e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>
-  ) => {
-    const el = e.currentTarget as HTMLImageElement | HTMLVideoElement;
+  const onMediaReady = (e: React.SyntheticEvent<any>) => {
+    const el = e.currentTarget as any;
     // reveal (CSS starts at opacity: 0)
     try {
       el.style.opacity = "1";
     } catch {}
     // revoke blob URL *after* media has loaded to free memory
     const src =
-      (el as HTMLImageElement).currentSrc ||
-      (el as HTMLImageElement).src ||
-      (el as HTMLVideoElement).currentSrc ||
-      (el as HTMLVideoElement).src ||
+      el.currentSrc ||
+      el.src ||
+      el.getAttribute?.("src") ||
       "";
     if (src && src.startsWith("blob:")) {
       try {
@@ -47,7 +46,11 @@ export default function PostCard({ post, onOpenProfile, onEnterWorld }: Props) {
     <article className="pc" data-post-id={(post as any).id}>
       {/* media */}
       <div className="pc-media">
-        {video ? (
+        {pdf ? (
+          <iframe src={pdf} onLoad={onMediaReady} />
+        ) : model3d ? (
+          <model-viewer src={model3d} onLoad={onMediaReady} camera-controls />
+        ) : video ? (
           <video
             src={video}
             controls
