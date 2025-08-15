@@ -96,6 +96,11 @@ button, input, textarea, select { font: inherit; color: inherit; }
   pointer-events: none;
 }
 
+/* Allow full media display inside the feed without enforced cropping */
+.feed-wrap .pc-media { aspect-ratio: auto; }
+.feed-wrap .pc-media img,
+.feed-wrap .pc-media video { object-fit: contain; }
+
 /* =========================
    Assistant Orb (bottom-right floating)
    ========================= */
