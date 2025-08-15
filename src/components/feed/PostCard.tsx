@@ -31,12 +31,25 @@ export default function PostCard({ post }: { post: Post }) {
     };
   }, [post.id]);
 
-  const mediaSrc = useMemo(() => {
-    const img = post?.images?.[0] || post?.image || post?.cover;
-    if (typeof img === "string") return img;
-    if ((img as any)?.url) return (img as any).url as string;
-    return "/vite.svg";
+  // Build image list (images[] preferred, else image/cover, else fallback)
+  const images = useMemo(() => {
+    const out: string[] = [];
+    const srcs =
+      post?.images && post.images.length
+        ? post.images
+        : [post?.image || post?.cover].filter(Boolean);
+
+    for (const img of srcs as any[]) {
+      if (!img) continue;
+      if (typeof img === "string") out.push(img);
+      else if (img.url) out.push(String(img.url));
+    }
+    if (!out.length) out.push("/vite.svg");
+    return out;
   }, [post]);
+
+  const [imgIndex, setImgIndex] = useState(0);
+  useEffect(() => { setImgIndex(0); }, [images]);
 
   const pdf = (post as any)?.pdf as string | undefined;
   const model3d = (post as any)?.model3d as string | undefined;
@@ -45,8 +58,7 @@ export default function PostCard({ post }: { post: Post }) {
   const onMediaReady = (e: React.SyntheticEvent<any>) => {
     const el = e.currentTarget as any;
     try { el.style.opacity = "1"; } catch {}
-    const src: string =
-      el.currentSrc || el.src || el.getAttribute?.("src") || "";
+    const src: string = el.currentSrc || el.src || el.getAttribute?.("src") || "";
     if (src && src.startsWith("blob:")) {
       try { URL.revokeObjectURL(src); } catch {}
     }
@@ -60,6 +72,7 @@ export default function PostCard({ post }: { post: Post }) {
     >
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
+        {/* Primary media: PDF → 3D → Video → Images (carousel) */}
         {pdf ? (
           <iframe
             src={pdf}
@@ -85,14 +98,50 @@ export default function PostCard({ post }: { post: Post }) {
             style={{ opacity: 0 }}
           />
         ) : (
-          <img
-            src={mediaSrc}
-            alt={post?.title || post?.author || "post"}
-            loading="lazy"
-            crossOrigin="anonymous"
-            onLoad={onMediaReady}
-            style={{ opacity: 0 }}
-          />
+          <>
+            {images.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={post?.title || post?.author || "post"}
+                loading="lazy"
+                crossOrigin="anonymous"
+                onLoad={onMediaReady}
+                className={i === imgIndex ? "active" : ""}
+                style={{ display: i === imgIndex ? "block" : "none" }}
+              />
+            ))}
+            {images.length > 1 && (
+              <>
+                <button
+                  className="pc-nav prev"
+                  onClick={() =>
+                    setImgIndex((i) => (i - 1 + images.length) % images.length)
+                  }
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+                <button
+                  className="pc-nav next"
+                  onClick={() => setImgIndex((i) => (i + 1) % images.length)}
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+                <div className="pc-dots">
+                  {images.map((_, i) => (
+                    <button
+                      key={i}
+                      className={i === imgIndex ? "on" : ""}
+                      onClick={() => setImgIndex(i)}
+                      aria-label={`View image ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         )}
 
         <div className="pc-topbar">
