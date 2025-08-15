@@ -60,18 +60,19 @@ export async function sharePost(arg: Post | ShareOptions | string): Promise<bool
   }
 
   // Legacy execCommand fallback
+  const ta = document.createElement("textarea");
   try {
-    const ta = document.createElement("textarea");
     ta.value = url;
     ta.style.position = "fixed";
     ta.style.opacity = "0";
     document.body.appendChild(ta);
     ta.select();
     document.execCommand("copy");
-    document.body.removeChild(ta);
     return true;
   } catch {
     return false;
+  } finally {
+    document.body.removeChild(ta);
   }
 }
 
