@@ -72,7 +72,7 @@ export default function PostCard({ post }: { post: Post }) {
             playsInline
             preload="metadata"
             onLoadedData={onMediaReady}
-            crossOrigin="anonymous"
+            crossOrigin={videoSrc?.startsWith("blob:") ? undefined : "anonymous"}
             style={{ opacity: 0 }}
           />
         ) : (
@@ -80,8 +80,8 @@ export default function PostCard({ post }: { post: Post }) {
             src={mediaSrc}
             alt={post?.title || post?.author || "post"}
             loading="lazy"
-            crossOrigin="anonymous"
             onLoad={onMediaReady}
+            crossOrigin={mediaSrc?.startsWith("blob:") ? undefined : "anonymous"}
             style={{ opacity: 0 }}
           />
         )}
