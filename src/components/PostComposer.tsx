@@ -12,9 +12,13 @@ export default function PostComposer() {
   const [link, setLink] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [video, setVideo] = useState<string | null>(null);
+  const [pdf, setPdf] = useState<string | null>(null);
+  const [model3d, setModel3d] = useState<string | null>(null);
 
   const imgInput = useRef<HTMLInputElement>(null);
   const vidInput = useRef<HTMLInputElement>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
+  const modelInput = useRef<HTMLInputElement>(null);
 
   const addImageFiles = useCallback((files: FileList | null) => {
     if (!files || !files.length) return;
@@ -31,6 +35,25 @@ export default function PostComposer() {
     if (f && f.type.startsWith("video/")) {
       // replace any previous selection (do not revoke here—PostCard will revoke after load)
       setVideo(URL.createObjectURL(f));
+    }
+  }, []);
+
+  const addPdfFile = useCallback((files: FileList | null) => {
+    if (!files || !files.length) return;
+    const f = files[0];
+    if (f && f.type === "application/pdf") {
+      setPdf(URL.createObjectURL(f));
+    }
+  }, []);
+
+  const addModelFile = useCallback((files: FileList | null) => {
+    if (!files || !files.length) return;
+    const f = files[0];
+    if (
+      f &&
+      (f.type.startsWith("model/") || /\.(glb|gltf|obj|stl|3mf)$/i.test(f.name))
+    ) {
+      setModel3d(URL.createObjectURL(f));
     }
   }, []);
 
@@ -72,6 +95,26 @@ export default function PostComposer() {
     if (vidInput.current) vidInput.current.value = "";
   }
 
+  function clearPdf() {
+    setPdf((p) => {
+      if (p?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(p); } catch {}
+      }
+      return null;
+    });
+    if (pdfInput.current) pdfInput.current.value = "";
+  }
+
+  function clearModel() {
+    setModel3d((m) => {
+      if (m?.startsWith("blob:")) {
+        try { URL.revokeObjectURL(m); } catch {}
+      }
+      return null;
+    });
+    if (modelInput.current) modelInput.current.value = "";
+  }
+
   async function handlePost() {
     if (!isSuperUser(key)) {
       alert("Invalid super user key");
@@ -86,6 +129,8 @@ export default function PostComposer() {
       time: "now",
       images: images.length ? images : undefined,
       video: video || undefined,
+      pdf: pdf || undefined,
+      model3d: model3d || undefined,
       link: link || undefined,
     };
 
@@ -98,6 +143,10 @@ export default function PostComposer() {
     if (imgInput.current) imgInput.current.value = "";
     setVideo(null);
     if (vidInput.current) vidInput.current.value = "";
+    setPdf(null);
+    if (pdfInput.current) pdfInput.current.value = "";
+    setModel3d(null);
+    if (modelInput.current) modelInput.current.value = "";
   }
 
   return (
@@ -111,7 +160,7 @@ export default function PostComposer() {
         onPaste={onPaste}
       />
 
-      {(images.length > 0 || video) && (
+      {(images.length > 0 || video || pdf || model3d) && (
         <div className="composer__attachments">
           {images.map((src, i) => (
             <div className="att" key={`img-${i}`}>
@@ -125,6 +174,22 @@ export default function PostComposer() {
             <div className="att att--video">
               <video src={video} controls playsInline preload="metadata" />
               <button className="att__x" title="Remove" onClick={clearVideo}>
+                ×
+              </button>
+            </div>
+          )}
+          {pdf && (
+            <div className="att att--pdf">
+              <iframe src={pdf} title="PDF preview" />
+              <button className="att__x" title="Remove" onClick={clearPdf}>
+                ×
+              </button>
+            </div>
+          )}
+          {model3d && (
+            <div className="att att--model">
+              <model-viewer src={model3d} camera-controls />
+              <button className="att__x" title="Remove" onClick={clearModel}>
                 ×
               </button>
             </div>
@@ -165,6 +230,38 @@ export default function PostComposer() {
             accept="video/*"
             hidden
             onChange={(e) => addVideoFile(e.currentTarget.files)}
+          />
+
+          <button
+            className="composer__tool"
+            type="button"
+            title="Add a PDF"
+            onClick={() => pdfInput.current?.click()}
+          >
+            📄
+          </button>
+          <input
+            ref={pdfInput}
+            type="file"
+            accept="application/pdf"
+            hidden
+            onChange={(e) => addPdfFile(e.currentTarget.files)}
+          />
+
+          <button
+            className="composer__tool"
+            type="button"
+            title="Add a 3D model"
+            onClick={() => modelInput.current?.click()}
+          >
+            🧊
+          </button>
+          <input
+            ref={modelInput}
+            type="file"
+            accept="model/*,.gltf,.glb,.obj,.stl,.3mf"
+            hidden
+            onChange={(e) => addModelFile(e.currentTarget.files)}
           />
 
           <input
