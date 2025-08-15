@@ -5,6 +5,10 @@ import bus from "../lib/bus";
  * Falls back to copying the URL to the clipboard and emitting a toast.
  */
 export async function sharePost(url: string, title?: string) {
+  if (typeof navigator === "undefined") {
+    bus.emit("toast", "Sharing not supported");
+    return;
+  }
   try {
     if (navigator.share) {
       await navigator.share({ url, title });
