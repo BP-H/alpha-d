@@ -25,8 +25,8 @@
 
 .pc-media,
 .post-media { position: relative; }
-.pc-media img, .pc-media video, .pc-media canvas,
-.post-media img, .post-media video, .post-media canvas{
+.pc-media img, .pc-media video, .pc-media canvas, .pc-media iframe, .pc-media embed, .pc-media model-viewer,
+.post-media img, .post-media video, .post-media canvas, .post-media iframe, .post-media embed, .post-media model-viewer{
   display:block; width:100vw; height:auto; background:#0f1117;
 }
 

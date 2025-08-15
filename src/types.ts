@@ -23,6 +23,8 @@ export type Post = {
   images?: string[];    // preferred: multiple images
   cover?: string;       // legacy alias
   video?: string;       // optional video URL (blob:/remote)
+  pdf?: string;         // optional PDF URL (blob:/remote)
+  model3d?: string;     // optional 3D model URL (blob:/remote)
   link?: string;        // optional external link being shared
 };
 
@@ -56,3 +58,11 @@ export type WorldState = {
   fogLevel: number;
   orbColor: string;
 };
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "model-viewer": any;
+    }
+  }
+}

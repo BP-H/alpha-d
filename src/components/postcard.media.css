@@ -2,7 +2,10 @@
    Minimal add-on so media inside the card fills and fades in. */
 
 .pc-media img,
-.pc-media video {
+.pc-media video,
+.pc-media iframe,
+.pc-media embed,
+.pc-media model-viewer {
   position: absolute;
   inset: 0;
   width: 100%;

@@ -68,3 +68,42 @@
 
 /* drop highlight */
 .pc-target .pc-media img{ outline: 3px solid rgba(255,116,222,.5); outline-offset:-3px; }
+
+/* carousel navigation */
+.pc-nav{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.45);
+  color:#fff;
+  border:0;
+  border-radius:999px;
+  cursor:pointer;
+  z-index:3;
+}
+.pc-nav.prev{ left:10px; }
+.pc-nav.next{ right:10px; }
+.pc-dots{
+  position:absolute;
+  bottom:12px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:6px;
+  z-index:3;
+}
+.pc-dots button{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  border:0;
+  padding:0;
+  background:rgba(255,255,255,.5);
+  cursor:pointer;
+}
+.pc-dots button.on{ background:#fff; }
