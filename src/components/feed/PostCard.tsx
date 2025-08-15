@@ -33,12 +33,44 @@ export default function PostCard({ post }: { post: Post }) {
     if ((img as any)?.url) return (img as any).url as string;
     return "/vite.svg";
   }, [post]);
+  const pdf = post?.pdf;
+  const model3d = post?.model3d;
+  const video = post?.video;
+
+  const onMediaReady = (e: React.SyntheticEvent<any>) => {
+    const el = e.currentTarget as any;
+    try { el.style.opacity = "1"; } catch {}
+    const src = el.currentSrc || el.src || el.getAttribute?.("src") || "";
+    if (src && src.startsWith("blob:")) {
+      try { URL.revokeObjectURL(src); } catch {}
+    }
+  };
 
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
-        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+        {pdf ? (
+          <iframe src={pdf} onLoad={onMediaReady} />
+        ) : model3d ? (
+          <model-viewer src={model3d} onLoad={onMediaReady} camera-controls />
+        ) : video ? (
+          <video
+            src={video}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedData={onMediaReady}
+          />
+        ) : (
+          <img
+            src={mediaSrc}
+            alt={post?.title || post?.author || "post"}
+            loading="lazy"
+            crossOrigin="anonymous"
+            onLoad={onMediaReady}
+          />
+        )}
 
         <div className="pc-topbar">
           <div className="pc-ava" title={post?.author}>
