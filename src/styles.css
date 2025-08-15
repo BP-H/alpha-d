@@ -19,7 +19,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
   --feed-max: min(100%, 1200px);
   --stripe-h: 64px;
-  --orb-size: 64px;
+  --orb-size: 76px;
 
   /* Theme accents */
   --pink: #ff74de;   /* Assistant orb theme */
@@ -106,14 +106,14 @@ button, input, textarea, select { font: inherit; color: inherit; }
   border: 1px solid rgba(255,255,255,.12);
   overflow: hidden; cursor: grab;
   display: grid; place-items: center;
-  transform: translate(-50%, -50%);
-  transition: left .16s ease, top .16s ease, box-shadow .2s ease, filter .2s ease;
-  /* 🔥 Hot pink identity */
+  contain: layout paint;
+  will-change: transform;
+  transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
   background: radial-gradient(120% 120% at 30% 30%, #fff, #ffd7f5 60%, var(--pink));
   box-shadow: 0 12px 30px rgba(0,0,0,.35), 0 0 0 8px color-mix(in srgb, var(--pink) 25%, transparent 75%);
 }
 .assistant-orb:hover { filter: saturate(115%); }
-.assistant-orb.flying { pointer-events: none; filter: saturate(150%); }
+.assistant-orb.flying { pointer-events: none; filter: saturate(150%); transition: none; }
 .assistant-orb.mic {
   box-shadow: 0 12px 30px rgba(0,0,0,.35), 0 0 0 10px color-mix(in srgb, var(--pink) 35%, transparent 65%);
 }
@@ -131,10 +131,29 @@ button, input, textarea, select { font: inherit; color: inherit; }
   100% { box-shadow: 0 0 0 28px rgba(0,0,0,0); }
 }
 .assistant-orb__toast{
-  position: absolute; right: 72px; top: 50%; transform: translateY(-50%);
+  position: absolute;
   white-space: nowrap; padding: 6px 8px; border-radius: 8px;
   background: rgba(0,0,0,.65); color: #fff; font-size: 12px;
   box-shadow: 0 8px 20px rgba(0,0,0,.25); pointer-events: none;
+}
+.assistant-orb__toast.right { left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+.assistant-orb__toast.left { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+.assistant-orb__toast.interim { bottom: calc(100% + 4px); top: auto; transform: none; }
+
+.assistant-panel{
+  position: fixed; z-index: 9998;
+  width: 320px; max-width: 40vw;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.45);
+  backdrop-filter: blur(8px) saturate(120%);
+  animation: panelIn .2s ease;
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: scale(0.98) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* =========================
