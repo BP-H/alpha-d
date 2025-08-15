@@ -34,11 +34,57 @@ export default function PostCard({ post }: { post: Post }) {
     return "/vite.svg";
   }, [post]);
 
+  const videoSrc = useMemo(() => {
+    const vid = (post as any)?.video;
+    if (typeof vid === "string") return vid;
+    if ((vid as any)?.url) return (vid as any).url as string;
+    return null;
+  }, [post]);
+
+  const onMediaReady = (
+    e: React.SyntheticEvent<HTMLImageElement | HTMLVideoElement>
+  ) => {
+    const el = e.currentTarget as HTMLImageElement | HTMLVideoElement;
+    try {
+      el.style.opacity = "1";
+    } catch {}
+    const src =
+      (el as HTMLImageElement).currentSrc ||
+      (el as HTMLImageElement).src ||
+      (el as HTMLVideoElement).currentSrc ||
+      (el as HTMLVideoElement).src ||
+      "";
+    if (src && src.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(src);
+      } catch {}
+    }
+  };
+
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
-        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+        {videoSrc ? (
+          <video
+            src={videoSrc}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedData={onMediaReady}
+            crossOrigin="anonymous"
+            style={{ opacity: 0 }}
+          />
+        ) : (
+          <img
+            src={mediaSrc}
+            alt={post?.title || post?.author || "post"}
+            loading="lazy"
+            crossOrigin="anonymous"
+            onLoad={onMediaReady}
+            style={{ opacity: 0 }}
+          />
+        )}
 
         <div className="pc-topbar">
           <div className="pc-ava" title={post?.author}>
