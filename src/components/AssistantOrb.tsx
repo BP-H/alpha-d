@@ -8,14 +8,14 @@ import type { AssistantMessage, Post } from "../types";
  * - 60fps drag via translate3d (no re-renders while moving)
  * - Pointer capture + pointerEvents:none during drag for correct hit-testing
  * - Hold 280ms to start voice (push-to-talk); mic lifecycle via SpeechRecognition events
- * - Drag & release over a post ⇒ links that post (toast)
+ * - Drag & release over a post ⇒ link that post (toast)
  * - Side-aware toasts/interim/panel that follow the orb via refs (no render churn)
  * - ESC closes panel & stops mic; handles lostpointercapture
- * - Persisted position (SSR-safe); tap vs. drag distinction; full cleanup
- * - Commands: /react, /comment, /world, /remix; emoji drawer for quick reactions
+ * - Tap vs drag suppression; position persisted to localStorage
+ * - Emoji drawer (🌀 / 🎬 + reactions) + /comment, /react, /world, /remix
  */
 
-/* Narrow SpeechRecognition type so we don’t rely on DOM lib flags */
+/* Minimal SpeechRecognition type (avoid DOM lib dependency in types) */
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -38,6 +38,7 @@ const STORAGE_KEY = "assistantOrbPos.v4";
 const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 const uuid = () => {
   try {
+    // runtime-safe even if crypto is not polyfilled during SSR
     return (globalThis as any)?.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
   } catch {
     return Math.random().toString(36).slice(2);
@@ -57,8 +58,14 @@ async function askLLMStub(text: string) {
   return `🤖 I’m a stub, but I heard: “${text}”`;
 }
 
+/** Helper that works on Element (no HTMLElement narrowing needed) */
+function getClosestPostId(el: Element | null): string | null {
+  // closest() returns Element | null; getAttribute exists on Element
+  return el?.closest?.("[data-post-id]")?.getAttribute?.("data-post-id") ?? null;
+}
+
 export default function AssistantOrb() {
-  // --- Committed position (for initial paint & persistence)
+  // --- committed position (for initial paint & persistence)
   const [pos, setPos] = useState(() => {
     if (typeof window === "undefined") return { x: 0, y: 0 };
     try {
@@ -77,7 +84,7 @@ export default function AssistantOrb() {
     };
   });
 
-  // Live position (mutated w/o re-render during drag)
+  // live position (mutated without re-render while dragging)
   const posRef = useRef<{ x: number; y: number }>({ ...pos });
 
   // --- UI / interaction state
@@ -89,14 +96,14 @@ export default function AssistantOrb() {
   const [ctxPost, setCtxPost] = useState<Post | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  // --- Gesture refs
+  // --- gesture refs
   const movedRef = useRef(false);
   const pressRef = useRef<{ id: number; dx: number; dy: number; sx: number; sy: number } | null>(null);
   const holdTimerRef = useRef<number | null>(null);
   const moveRafRef = useRef<number | null>(null);
   const lastPtrRef = useRef<{ x: number; y: number } | null>(null);
   const suppressClickRef = useRef(false);  // after hold
-  const preventTapRef = useRef(false);     // after drag
+  const preventTapRef   = useRef(false);   // after drag
   const hoverIdRef = useRef<string | null>(null);
 
   // --- DOM refs
@@ -106,7 +113,7 @@ export default function AssistantOrb() {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const msgListRef = useRef<HTMLDivElement | null>(null);
 
-  // --- Feed context
+  // --- feed context
   useEffect(() => {
     const a = bus.on?.("feed:hover", (p: { post: Post }) => setCtxPost(p.post));
     const b = bus.on?.("feed:select", (p: { post: Post }) => setCtxPost(p.post));
@@ -167,7 +174,7 @@ export default function AssistantOrb() {
     if (lower.startsWith("/react")) {
       const emoji = T.replace("/react", "").trim() || "❤️";
       if (post) {
-        bus.emit("post:react", { id: post.id, emoji });
+        bus.emit?.("post:react", { id: post.id, emoji });
         push({ id: uuid(), role: "assistant", text: `✨ Reacted ${emoji} on ${post.id}`, ts: Date.now(), postId: (post.id as any) });
       } else {
         push({ id: uuid(), role: "assistant", text: "⚠️ Drag the orb over a post first.", ts: Date.now() });
@@ -194,7 +201,7 @@ export default function AssistantOrb() {
 
     if (lower.startsWith("/remix")) {
       if (post) {
-        bus.emit("post:remix", { id: post.id });
+        bus.emit?.("post:remix", { id: post.id });
         push({ id: uuid(), role: "assistant", text: `🎬 Remixing ${post.id}`, ts: Date.now(), postId: (post.id as any) });
       } else {
         push({ id: uuid(), role: "assistant", text: "⚠️ Drag onto a post to remix.", ts: Date.now() });
@@ -213,7 +220,7 @@ export default function AssistantOrb() {
     handleCommand(`/react ${emoji}`);
   }
 
-  // --- Hover highlight helper
+  // --- hover highlight helper
   function setHover(id: string | null) {
     if (hoverIdRef.current) {
       document.querySelector(`[data-post-id="${hoverIdRef.current}"]`)?.classList.remove("pc-target");
@@ -225,24 +232,21 @@ export default function AssistantOrb() {
     }
   }
 
-  // --- Helpers: movement & anchoring
+  // --- high-performance movement & anchoring
   function applyTransform(x: number, y: number) {
     const el = orbRef.current; if (!el) return;
     el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  }
-
-  function postIdFromPoint(x: number, y: number): string | null {
-    const under = document.elementFromPoint(x, y);
-    const target = (under as Element | null)?.closest?.("[data-post-id]");
-    return target?.getAttribute?.("data-post-id") ?? null; // ✅ avoid Element.dataset typing issue
   }
 
   /** Position toasts / interim / panel without re-rendering */
   function updateAnchors() {
     if (typeof window === "undefined") return;
     const { x, y } = posRef.current;
+
+    const panelEl = panelRef.current;
+    const measuredPanelW = panelEl?.offsetWidth || PANEL_WIDTH;
     const spaceRight = window.innerWidth - (x + ORB_SIZE + 8);
-    const placeRightPanel = spaceRight >= (PANEL_WIDTH + 16);
+    const placeRightPanel = spaceRight >= (measuredPanelW + 16);
     const placeRightToast = spaceRight >= 200; // smaller threshold for toast/interim
 
     // toast
@@ -254,7 +258,7 @@ export default function AssistantOrb() {
       s.transform = placeRightToast ? "translateY(-50%)" : "translate(-100%, -50%)";
     }
 
-    // interim
+    // interim transcript
     if (interimRef.current) {
       const s = interimRef.current.style;
       s.position = "fixed";
@@ -264,10 +268,11 @@ export default function AssistantOrb() {
     }
 
     // panel
-    if (panelRef.current && open) {
-      const s = panelRef.current.style;
+    if (panelEl && open) {
+      const s = panelEl.style;
+      const panelH = panelEl.offsetHeight || 260;
+      const top = clamp(y - 180, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - panelH - ORB_MARGIN));
       s.position = "fixed";
-      const top = clamp(y - 180, ORB_MARGIN, Math.max(ORB_MARGIN, window.innerHeight - 320));
       s.top = `${top}px`;
       if (placeRightPanel) {
         s.left = `${x + ORB_SIZE + 8}px`;
@@ -281,7 +286,7 @@ export default function AssistantOrb() {
     }
   }
 
-  // --- Pointer handlers
+  // --- pointer handlers
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     const el = orbRef.current; if (!el) return;
     try { el.setPointerCapture(e.pointerId); } catch {}
@@ -327,7 +332,8 @@ export default function AssistantOrb() {
       updateAnchors();
 
       // highlight post under pointer
-      const id = postIdFromPoint(cur.x, cur.y);
+      const under = document.elementFromPoint(cur.x, cur.y);
+      const id = getClosestPostId(under);
       if (id !== hoverIdRef.current) {
         setHover(id);
         if (id) bus.emit?.("feed:select-id", { id });
@@ -349,11 +355,12 @@ export default function AssistantOrb() {
     if (mic && suppressClickRef.current) {
       stopListening();
       if (movedRef.current) {
-        const id = postIdFromPoint(clientX, clientY);
+        const under = document.elementFromPoint(clientX, clientY);
+        const id = getClosestPostId(under);
         if (id) {
-          bus.emit("post:focus", { id });
+          bus.emit?.("post:focus", { id });
           setToast(`🎯 linked to ${id}`);
-          window.setTimeout(() => setToast(""), 1200);
+          window.setTimeout(() => setToast(""), 1100);
         }
       }
     }
@@ -373,7 +380,7 @@ export default function AssistantOrb() {
   };
 
   const onLostPointerCapture = () => {
-    // Graceful finish if the browser/OS cancels capture
+    // Graceful finish if the browser cancels capture
     const last = lastPtrRef.current;
     const fallback = { x: posRef.current.x + ORB_SIZE / 2, y: posRef.current.y + ORB_SIZE / 2 };
     finishGesture(last?.x ?? fallback.x, last?.y ?? fallback.y);
@@ -390,7 +397,7 @@ export default function AssistantOrb() {
     requestAnimationFrame(updateAnchors);
   };
 
-  // --- Lifecycle & global handlers
+  // --- lifecycle & global handlers
   useEffect(() => { applyTransform(pos.x, pos.y); posRef.current = { ...pos }; updateAnchors(); }, []); // initial paint
   useEffect(() => { updateAnchors(); }, [open, toast, interim]);
   useEffect(() => { if (msgListRef.current) msgListRef.current.scrollTop = msgListRef.current.scrollHeight; }, [msgs]);
@@ -416,7 +423,7 @@ export default function AssistantOrb() {
     };
   }, []);
 
-  // Unmount cleanup
+  // unmount cleanup
   useEffect(() => {
     return () => {
       try { recRef.current?.stop?.(); } catch {}
@@ -427,7 +434,7 @@ export default function AssistantOrb() {
     };
   }, []);
 
-  // --- Styles
+  // --- styles
   const keyframes = `
     @keyframes panelIn { from { opacity: 0; transform: scale(.97) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
   `;
@@ -447,7 +454,7 @@ export default function AssistantOrb() {
       : "0 12px 30px rgba(0,0,0,.35)",
     willChange: "transform",
     transition: dragging ? "none" : "box-shadow .2s ease, filter .2s ease",
-    cursor: (dragging ? "grabbing" : "grab") as const,
+    cursor: dragging ? "grabbing" : "grab",
     transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, // initial; live updates via applyTransform()
   };
 
@@ -486,7 +493,7 @@ export default function AssistantOrb() {
     animation: "panelIn .2s ease-out",
   };
 
-  // --- Render
+  // --- render
   return (
     <>
       <style>{keyframes}</style>
@@ -511,7 +518,7 @@ export default function AssistantOrb() {
       {toast && <div ref={toastRef} style={toastBoxStyle} aria-live="polite">{toast}</div>}
       {interim && <div ref={interimRef} style={toastBoxStyle} aria-live="polite">…{interim}</div>}
 
-      {/* compact side panel (positioned via updateAnchors) */}
+      {/* compact side panel */}
       {open && (
         <div ref={panelRef} style={panelStyle}>
           <div style={{ fontWeight: 800, paddingBottom: 4, display: "flex", alignItems: "center" }}>
@@ -529,10 +536,7 @@ export default function AssistantOrb() {
           </div>
 
           {/* messages */}
-          <div
-            ref={msgListRef}
-            style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 200, overflowY: "auto", padding: "6px 0" }}
-          >
+          <div ref={msgListRef} style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 200, overflowY: "auto", padding: "6px 0" }}>
             {msgs.length === 0 && <div style={{ fontSize: 13, opacity: .75 }}>Hold the orb to speak, type a command, or tap an emoji to react.</div>}
             {msgs.map(m => (
               <div key={m.id} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
@@ -551,17 +555,7 @@ export default function AssistantOrb() {
           </div>
 
           {/* emoji drawer */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(10, 1fr)",
-              gap: 6,
-              padding: 8,
-              background: "rgba(255,255,255,.04)",
-              border: "1px solid rgba(255,255,255,.06)",
-              borderRadius: 10
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 6, padding: 8, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.06)", borderRadius: 10 }}>
             {EMOJI_LIST.map(e => (
               <button
                 key={e}
