@@ -8,7 +8,9 @@ export function on(event: string, handler: Handler) {
   return () => off(event, handler);
 }
 export function off(event: string, handler: Handler) {
-  listeners.get(event)?.delete(handler);
+  const handlers = listeners.get(event);
+  handlers?.delete(handler);
+  if (handlers && handlers.size === 0) listeners.delete(event);
 }
 export function emit(event: string, payload?: any) {
   listeners.get(event)?.forEach(fn => { try { fn(payload); } catch (e) { console.error(e); } });
