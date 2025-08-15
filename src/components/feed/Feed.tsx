@@ -60,7 +60,7 @@ export default function Feed() {
       <div className="feed-wrap">
         <div className="feed-content">
           {visible.length ? (
-            visible.map((p, i) => <PostCard key={`${p.id}-${i}`} post={p} />)
+            visible.map((p) => <PostCard key={String(p.id)} post={p} />)
           ) : (
             <EmptyState />
           )}
