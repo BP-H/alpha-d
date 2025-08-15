@@ -31,6 +31,10 @@ export default function PostCard({ post }: { post: Post }) {
     };
   }, [post.id]);
 
+  // Helper: only add crossOrigin for non-blob/data URLs
+  const cors = (u?: string) =>
+    u && !u.startsWith("blob:") && !u.startsWith("data:") ? "anonymous" : undefined;
+
   // Build image list (images[] preferred, else image/cover, else fallback)
   const images = useMemo(() => {
     const out: string[] = [];
@@ -93,7 +97,7 @@ export default function PostCard({ post }: { post: Post }) {
             controls
             playsInline
             preload="metadata"
-            crossOrigin="anonymous"
+            crossOrigin={cors(video)}
             onLoadedData={onMediaReady}
             style={{ opacity: 0 }}
           />
@@ -105,7 +109,7 @@ export default function PostCard({ post }: { post: Post }) {
                 src={src}
                 alt={post?.title || post?.author || "post"}
                 loading="lazy"
-                crossOrigin="anonymous"
+                crossOrigin={cors(src)}
                 onLoad={onMediaReady}
                 className={i === imgIndex ? "active" : ""}
                 style={{ display: i === imgIndex ? "block" : "none" }}
