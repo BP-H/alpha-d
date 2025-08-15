@@ -34,11 +34,18 @@ export default function PostCard({ post }: { post: Post }) {
     return "/vite.svg";
   }, [post]);
 
+  const remoteMedia = mediaSrc.startsWith("http");
+
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
-        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+        <img
+          src={mediaSrc}
+          alt={post?.title || post?.author || "post"}
+          loading="lazy"
+          crossOrigin={remoteMedia ? "anonymous" : undefined}
+        />
 
         <div className="pc-topbar">
           <div className="pc-ava" title={post?.author}>
