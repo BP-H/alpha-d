@@ -18,7 +18,11 @@
 .pc + .pc{ margin-top:12px; }
 
 .pc-media{ position:relative; }
-.pc-media img{ display:block; width:100%; height:auto; background:#0f1117; border-radius: var(--pc-radius); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+.pc-media img,
+.pc-media video,
+.pc-media iframe,
+.pc-media embed,
+.pc-media model-viewer{ display:block; width:100%; height:auto; background:#0f1117; border-radius: var(--pc-radius); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
 
 /* Frosted bars */
 .pc-topbar, .pc-botbar{
@@ -67,4 +71,8 @@
 .pc.dopen .pc-drawer{ max-height: 520px; opacity:1; transform:none; overflow:auto; }
 
 /* drop highlight */
-.pc-target .pc-media img{ outline: 3px solid rgba(255,116,222,.5); outline-offset:-3px; }
+.pc-target .pc-media img,
+.pc-target .pc-media video,
+.pc-target .pc-media iframe,
+.pc-target .pc-media embed,
+.pc-target .pc-media model-viewer{ outline: 3px solid rgba(255,116,222,.5); outline-offset:-3px; }

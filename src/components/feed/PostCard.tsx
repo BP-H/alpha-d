@@ -27,18 +27,39 @@ export default function PostCard({ post }: { post: Post }) {
     return () => { off1?.(); off2?.(); off3?.(); };
   }, [post.id]);
 
-  const mediaSrc = useMemo(() => {
+  const mediaEl = useMemo(() => {
+    if (post?.video) {
+      return (
+        <video
+          src={post.video}
+          controls
+          playsInline
+          preload="metadata"
+        />
+      );
+    }
+    if (post?.pdf) {
+      return <iframe src={post.pdf} title="pdf" />;
+    }
+    if (post?.model3d) {
+      return <model-viewer src={post.model3d} camera-controls autoplay />;
+    }
     const img = post?.images?.[0] || post?.image || post?.cover;
-    if (typeof img === "string") return img;
-    if ((img as any)?.url) return (img as any).url as string;
-    return "/vite.svg";
+    if (typeof img === "string") {
+      return <img src={img} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />;
+    }
+    if ((img as any)?.url) {
+      const src = (img as any).url as string;
+      return <img src={src} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />;
+    }
+    return <img src="/vite.svg" alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />;
   }, [post]);
 
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
-        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+        {mediaEl}
 
         <div className="pc-topbar">
           <div className="pc-ava" title={post?.author}>

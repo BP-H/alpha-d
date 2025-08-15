@@ -17,12 +17,15 @@ export type Post = {
   title?: string;
   time?: string;
   location?: string;
+  text?: string;
 
   /** Media (new + legacy) */
   image?: string;       // legacy single image
   images?: string[];    // preferred: multiple images
   cover?: string;       // legacy alias
   video?: string;       // optional video URL (blob:/remote)
+  pdf?: string;         // optional PDF attachment
+  model3d?: string;     // optional 3D model (.glb/.gltf)
   link?: string;        // optional external link being shared
 };
 
