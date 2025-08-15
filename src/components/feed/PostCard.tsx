@@ -27,18 +27,63 @@ export default function PostCard({ post }: { post: Post }) {
     return () => { off1?.(); off2?.(); off3?.(); };
   }, [post.id]);
 
-  const mediaSrc = useMemo(() => {
-    const img = post?.images?.[0] || post?.image || post?.cover;
-    if (typeof img === "string") return img;
-    if ((img as any)?.url) return (img as any).url as string;
-    return "/vite.svg";
+  const images = useMemo(() => {
+    const imgs: string[] = [];
+    const srcs = post?.images && post.images.length ? post.images : [post?.image || post?.cover].filter(Boolean);
+    for (const img of srcs as any[]) {
+      if (!img) continue;
+      if (typeof img === "string") imgs.push(img);
+      else if (img.url) imgs.push(img.url as string);
+    }
+    if (!imgs.length) imgs.push("/vite.svg");
+    return imgs;
   }, [post]);
+  const [imgIndex, setImgIndex] = useState(0);
+  useEffect(() => { setImgIndex(0); }, [images]);
 
   return (
     <article className={`pc ${drawer ? "dopen" : ""}`} data-post-id={String(post?.id || "")} id={`post-${post.id}`}>
       <div className="pc-badge" aria-hidden />
       <div className="pc-media">
-        <img src={mediaSrc} alt={post?.title || post?.author || "post"} loading="lazy" crossOrigin="anonymous" />
+        {images.map((src, i) => (
+          <img
+            key={i}
+            src={src}
+            alt={post?.title || post?.author || "post"}
+            loading="lazy"
+            crossOrigin="anonymous"
+            className={i === imgIndex ? "active" : ""}
+            style={{ display: i === imgIndex ? "block" : "none" }}
+          />
+        ))}
+        {images.length > 1 && (
+          <>
+            <button
+              className="pc-nav prev"
+              onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+            <button
+              className="pc-nav next"
+              onClick={() => setImgIndex(i => (i + 1) % images.length)}
+              aria-label="Next image"
+            >
+              ›
+            </button>
+            <div className="pc-dots">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  className={i === imgIndex ? "on" : ""}
+                  onClick={() => setImgIndex(i)}
+                  aria-label={`View image ${i + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="pc-topbar">
           <div className="pc-ava" title={post?.author}>
